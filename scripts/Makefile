@@ -1,6 +1,6 @@
 RM := rm -rf
 CXX := g++
-CXXFLAGS := -O3 -Wall -MMD -MP -std=c++23 $(shell pkg-config --with-path=$(PKG_CONFIG_PATH) --cflags gtkmm-4.0)
+CXXFLAGS := -O3 -Wall -MMD -MP -std=c++20 $(shell pkg-config --with-path=$(PKG_CONFIG_PATH) --cflags gtkmm-4.0)
 LIBS := $(shell pkg-config --with-path=$(PKG_CONFIG_PATH) --libs gtkmm-4.0) -lglew32 -lopengl32
 
 ROOT_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
@@ -24,7 +24,7 @@ all: $(BIN)
 
 $(BIN): $(OBJS) $(RES)
 	@echo "Creating executable $@"
-	$(CXX) $(OBJS) $(RES) -o $@ $(LIBS)
+	$(CXX) $(OBJS) -mwindows $(RES) -o $@ $(LIBS)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 	@echo "Compiling $<"

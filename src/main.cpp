@@ -14,5 +14,14 @@ int main(int argc, char* argv[])
     g_log_set_default_handler(suppress_locale_warning, nullptr);
 
     auto app = Gtk::Application::create("mvf.app");
+    
+    auto css_provider = Gtk::CssProvider::create();
+    css_provider->load_from_path("assets/main.css");
+    Gtk::StyleContext::add_provider_for_display(
+        Gdk::Display::get_default(),
+        css_provider,
+        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION
+    );
+
     return app->make_window_and_run<MainWindow>(argc, argv);
 }
