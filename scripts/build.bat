@@ -45,5 +45,5 @@ if !MAKE_EXIT_CODE! neq 0 (
     echo [INFO] Build failed...    
 ) else (
     echo [INFO] Build succeeded...
-    )
+)
 

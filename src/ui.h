@@ -44,7 +44,7 @@ private:
     bool on_window_close();
 
     sigc::connection file_loader_conn;
-    std::unique_ptr<LoadProxy> loader;
+    std::unique_ptr<MVF::LoadProxy> loader;
     std::string vtk_filename;
 
     Gtk::Box m_vbox{Gtk::Orientation::VERTICAL};

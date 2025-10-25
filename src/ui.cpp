@@ -1,6 +1,7 @@
 #include <iostream>
 #include "ui.h"
 #include "vtk.h"
+#include "error.h"
 
 using namespace Gtk;
 
@@ -26,11 +27,10 @@ void GLWidget::on_realize() {
         make_current();
         GLenum res = glewInit();
         if (res != GLEW_OK) {
-            std::cerr << "Error: " << glewGetErrorString(res) << std::endl;
-            exit(1);
+            MVF::app_error(std::string("Error: ") + reinterpret_cast<const char*>(glewGetErrorString(res)));
         }
     } catch (const Gdk::GLError& gle) {
-        std::cerr << "Failed to realize GLArea: " << gle.what() << std::endl;
+        MVF::app_error(std::string("Failed to realize GLArea ") + gle.what());
     }
 
     glEnable(GL_DEPTH_TEST);
@@ -58,8 +58,11 @@ bool GLWidget::on_tick() {
 }
 
 MainWindow::MainWindow() {
+    extern MVF::ErrorBox main_error_box;
+    
     set_title("Test");
     set_default_size(1024, 1024);
+    main_error_box = MVF::ErrorBox(this, get_application().get());
 
     m_vbox.append(m_menubox);
     m_vbox.append(m_hbox);
@@ -165,10 +168,13 @@ void MainWindow::on_file_open() {
         if (response == Gtk::ResponseType::ACCEPT) {
             auto filename = dialog->get_file()->get_path();
            
-            progress_bar.show();
+            loader = MVF::open_vtk_async(filename);
+            if (loader->read_failed) {
+                return;
+            }
+            
             vtk_filename = filename;
-
-            loader = open_vtk_async(filename);
+            progress_bar.show();
             file_loader_conn = Glib::signal_timeout().connect(sigc::mem_fun(*this, &MainWindow::file_load_handler), 16);
             loader->load();
         }
@@ -177,7 +183,7 @@ void MainWindow::on_file_open() {
 
 bool MainWindow::file_load_handler() {
     if (loader->read_failed) {
-        std::cerr << "Invalid file format for given file: " << vtk_filename << std::endl;
+        MVF::app_warn("Invalid file format");
         loader->complete();
         progress_bar.hide();
         return false;

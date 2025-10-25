@@ -16,14 +16,12 @@ def raw_to_vtk(raw_filename, vtk_filename, field_name, dims, spacing, origin, dt
     nx, ny, nz = dims
     num_points = nx * ny * nz
 
-    # --- Load binary data ---
     data = np.fromfile(raw_filename, dtype=dtype)
     if data.size != num_points:
         raise ValueError(
             f"Data size mismatch: expected {num_points} elements, got {data.size}"
         )
 
-    # --- Write VTK ASCII file ---
     with open(vtk_filename, "w") as vtk:
         vtk.write("# vtk DataFile Version 5.1\n")
         vtk.write("vtk output\n")
@@ -36,17 +34,12 @@ def raw_to_vtk(raw_filename, vtk_filename, field_name, dims, spacing, origin, dt
         vtk.write("FIELD FieldData 1\n")
         vtk.write(f"{field_name} 1 {num_points} double\n")
 
-        # Write data in rows of 9 for readability
         for i in range(0, num_points, 9):
             chunk = data[i:i+9]
             vtk.write(" ".join(map(str, chunk)) + "\n")
 
     print(f"Wrote VTK file: {vtk_filename}")
 
-
-# ----------------------------
-# Example usage:
-# ----------------------------
 if __name__ == "__main__":
     raw_to_vtk(
         raw_filename="redseasmall/beechnut_1024x1024x1546_uint16.raw",
