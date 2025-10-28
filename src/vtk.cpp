@@ -5,8 +5,29 @@
 #include "vtk.h"
 
 namespace MVF {
+    bool read_file(const std::string& filename, std::string& out) {
+        std::ifstream file(filename, std::ios::in | std::ios::binary);
+        if (!file) {
+            std::cerr << "Unable to open file: " << filename << std::endl;
+            return false; 
+        }
+
+        std::ostringstream ss;
+        ss << file.rdbuf(); 
+        out = ss.str();
+
+        return true;
+    }
+    
+    
+#ifdef MVF_DEBUG
+    VolumeData::~VolumeData() {
+        std::cout << "Destroyed model object: " << filename << std::endl;
+    }
+#endif
+
     std::unique_ptr<LoadProxy> open_vtk_async(const std::string& filename) {
-        VolumeData vol = {};
+        auto vol = std::make_shared<VolumeData>();
         size_t total_bytes = 0;
         size_t total_fields = 0;
         std::ifstream file(filename, std::ios::binary);
@@ -22,32 +43,35 @@ namespace MVF {
             std::istringstream ss(line);
             std::string tag;
             if (line.rfind("DIMENSIONS", 0) == 0) {
-                ss >> tag >> vol.nx >> vol.ny >> vol.nz;
+                ss >> tag >> vol->nx >> vol->ny >> vol->nz;
             } 
             else if (line.rfind("SPACING", 0) == 0) {
-                ss >> tag >> vol.spacing.x >> vol.spacing.y >> vol.spacing.z;
+                ss >> tag >> vol->spacing.x >> vol->spacing.y >> vol->spacing.z;
             } 
             else if (line.rfind("ORIGIN", 0) == 0) {
-                ss >> tag >> vol.origin.x >> vol.origin.y >> vol.origin.z;
+                ss >> tag >> vol->origin.x >> vol->origin.y >> vol->origin.z;
             } 
             else if (line.rfind("FIELD", 0) == 0) {
                 size_t fields;
                 std::string _name;
                 ss >> tag >> _name >> fields;
                 total_fields = fields;
-                total_bytes = fields * vol.nx * vol.ny * vol.nz;
+                total_bytes = fields * vol->nx * vol->ny * vol->nz;
                 break;
             }
         }
 
+        vol->filename = filename;
+
         proxy->file_offset = file.tellg();
         proxy->file = std::move(file);
+        proxy->filename = filename;
         proxy->data = vol;
         proxy->num_bytes_read = 0;
         proxy->total_bytes = total_bytes;
         proxy->total_fields_read = 0;
         proxy->total_fields = total_fields;
-        proxy->field_size = (size_t)(vol.nx * vol.ny * vol.nz);
+        proxy->field_size = (size_t)(vol->nx * vol->ny * vol->nz);
         proxy->read_failed = false;
         proxy->thread_dispatched = false;
 
@@ -106,10 +130,10 @@ namespace MVF {
                             return;
                         }
 
-                        data.scalars[cur_tag] = std::make_tuple(std::vector<float>(count * comps), comps);
+                        data->scalars[cur_tag] = std::make_tuple(std::vector<float>(count * comps), comps);
                     }
 
-                    auto& dest = std::get<0>(data.scalars[cur_tag]);
+                    auto& dest = std::get<0>(data->scalars[cur_tag]);
                     while (ptr < end || !stop_requested.load(std::memory_order_relaxed)) {
                         // Skip whitespace
                         while (ptr < end && std::isspace(static_cast<unsigned char>(*ptr))) ++ptr;
@@ -169,5 +193,15 @@ namespace MVF {
         if (worker_thread.joinable()) {
             worker_thread.join();
         }
+
+        thread_dispatched.store(false, std::memory_order::release);
     }
+
+#ifdef MVF_DEBUG
+    LoadProxy::~LoadProxy() {
+        std::cout << "Destroyed proxy object: " << filename << std::endl;
+    }
+#endif
 }
+
+

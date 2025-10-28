@@ -26,7 +26,7 @@ Vector3f& Vector3f::operator*=(float f) {
 
 Vector3f::operator const float*() const { return &x; }
 
-float Vector3f::Dot(const Vector3f& v) const {
+float Vector3f::dot(const Vector3f& v) const {
     return x * v.x + y * v.y + z * v.z;
 }
 
@@ -46,7 +46,7 @@ Vector3f Vector3f::operator*(float f) const {
     return Vector3f(x * f, y * f, z * f);
 }
 
-Vector3f Vector3f::Cross(const Vector3f& v) const {
+Vector3f Vector3f::cross(const Vector3f& v) const {
     return Vector3f(
         y * v.z - z * v.y,
         z * v.x - x * v.z,
@@ -54,7 +54,7 @@ Vector3f Vector3f::Cross(const Vector3f& v) const {
     );
 }
 
-Vector3f& Vector3f::Normalize() {
+Vector3f& Vector3f::normalize() {
     float Length = sqrtf(x * x + y * y + z * z);
     x /= Length; y /= Length; z /= Length;
     return *this;
@@ -71,13 +71,13 @@ float Vector3f::length() {
     return sqrtf(x * x + y * y + z * z);
 }
 
-void Vector3f::Print() const {
+void Vector3f::print() const {
     printf("(%.02f, %.02f, %.02f)", x, y, z);
 }
 
 Vector4f::Vector4f() {}
 Vector4f::Vector4f(float _x, float _y, float _z, float _w) : x(_x), y(_y), z(_z), w(_w) {}
-void Vector4f::Print() const {
+void Vector4f::print() const {
     printf("(%.02f, %.02f, %.02f, %.02f)", x, y, z, w);
 }
 
@@ -97,11 +97,11 @@ Matrix4f::Matrix4f(float a00, float a01, float a02, float a03,
     m[3][0] = a30; m[3][1] = a31; m[3][2] = a32; m[3][3] = a33;
 }
 
-void Matrix4f::SetZero() { 
+void Matrix4f::set_zero() { 
     std::memset(m, 0, sizeof(m));
 }
 
-Matrix4f Matrix4f::Transpose() const {
+Matrix4f Matrix4f::transpose() const {
     Matrix4f n;
     for (unsigned int i = 0; i < 4; i++)
         for (unsigned int j = 0; j < 4; j++)
@@ -109,14 +109,14 @@ Matrix4f Matrix4f::Transpose() const {
     return n;
 }
 
-Matrix4f Matrix4f::CreateIdentity() {
+Matrix4f Matrix4f::create_identity() {
     Matrix4f m;
-    m.InitIdentity();
+    m.init_identity();
     
     return m;
 }
 
-void Matrix4f::InitIdentity() {
+void Matrix4f::init_identity() {
     m[0][0] = 1.0f; m[0][1] = 0.0f; m[0][2] = 0.0f; m[0][3] = 0.0f;
     m[1][0] = 0.0f; m[1][1] = 1.0f; m[1][2] = 0.0f; m[1][3] = 0.0f;
     m[2][0] = 0.0f; m[2][1] = 0.0f; m[2][2] = 1.0f; m[2][3] = 0.0f;
@@ -150,7 +150,7 @@ Vector3f Matrix4f::operator*(const Vector3f& v) const {
     return Vector3f(i.x, i.y, i.z);
 }
 
-Vector3f Matrix4f::DirTransform(const Vector3f& v) const {
+Vector3f Matrix4f::dir_transform(const Vector3f& v) const {
     Vector4f r(v.x, v.y, v.z, 0.0);
     Vector4f i = *this * r;
     
@@ -162,12 +162,12 @@ Matrix4f::operator const float*() const {
     return &(m[0][0]);
 }
 
-void Matrix4f::Print() const {
+void Matrix4f::print() const {
     for (int i = 0; i < 4; i++)
         printf("%6.2f %6.2f %6.2f %6.2f\n", m[i][0], m[i][1], m[i][2], m[i][3]);
 }
 
-float Matrix4f::Determinant() const {
+float Matrix4f::determinant() const {
     return m[0][0] * m[1][1] * m[2][2] * m[3][3] - m[0][0] * m[1][1] * m[2][3] * m[3][2] + m[0][0] * m[1][2] * m[2][3] * m[3][1] - m[0][0] * m[1][2] * m[2][1] * m[3][3]
         + m[0][0] * m[1][3] * m[2][1] * m[3][2] - m[0][0] * m[1][3] * m[2][2] * m[3][1] - m[0][1] * m[1][2] * m[2][3] * m[3][0] + m[0][1] * m[1][2] * m[2][0] * m[3][3]
         - m[0][1] * m[1][3] * m[2][0] * m[3][2] + m[0][1] * m[1][3] * m[2][2] * m[3][0] - m[0][1] * m[1][0] * m[2][2] * m[3][3] + m[0][1] * m[1][0] * m[2][3] * m[3][2]
@@ -176,7 +176,7 @@ float Matrix4f::Determinant() const {
         - m[0][3] * m[1][1] * m[2][2] * m[3][0] + m[0][3] * m[1][1] * m[2][0] * m[3][2] - m[0][3] * m[1][2] * m[2][0] * m[3][1] + m[0][3] * m[1][2] * m[2][1] * m[3][0];
 }
 
-Matrix4f& Matrix4f::Inverse() {
+Matrix4f& Matrix4f::inverse() {
     float inv[16], det;
     float* m = &this->m[0][0];
 
@@ -307,22 +307,22 @@ Matrix4f& Matrix4f::Inverse() {
     return *this;
 }
 
-void Matrix4f::InitScaleTransform(float ScaleX, float ScaleY, float ScaleZ) {
-    InitIdentity();
+void Matrix4f::init_scale_transform(float ScaleX, float ScaleY, float ScaleZ) {
+    init_identity();
     m[0][0] = ScaleX;
     m[1][1] = ScaleY;
     m[2][2] = ScaleZ;
 }
 
-void Matrix4f::InitRotateTransform(float RotateX, float RotateY, float RotateZ) {
+void Matrix4f::init_rotate_transform(float RotateX, float RotateY, float RotateZ) {
     Matrix4f rx, ry, rz;
     float x = ToRadian(RotateX);
     float y = ToRadian(RotateY);
     float z = ToRadian(RotateZ);
 
-    rx.InitIdentity();
-    ry.InitIdentity();
-    rz.InitIdentity();
+    rx.init_identity();
+    ry.init_identity();
+    rz.init_identity();
 
     rx.m[1][1] = cosf(x); rx.m[1][2] = -sinf(x);
     rx.m[2][1] = sinf(x); rx.m[2][2] = cosf(x);
@@ -336,7 +336,7 @@ void Matrix4f::InitRotateTransform(float RotateX, float RotateY, float RotateZ) 
     *this = rz * ry * rx;
 }
 
-void Matrix4f::InitAxisRotateTransform(const Vector3f& axis, float angle) {
+void Matrix4f::init_axis_rotate_transform(const Vector3f& axis, float angle) {
     float x = axis.x, y = axis.y, z = axis.z;
     float c = cosf(angle);
     float s = sinf(angle);
@@ -363,25 +363,23 @@ void Matrix4f::InitAxisRotateTransform(const Vector3f& axis, float angle) {
     m[3][3] = 1.0f;
 }
 
-void Matrix4f::InitTranslationTransform(float x, float y, float z) {
-    InitIdentity();
+void Matrix4f::init_translation_transform(float x, float y, float z) {
+    init_identity();
     m[0][3] = x;
     m[1][3] = y;
     m[2][3] = z;
 }
 
-
-// Target is z axis, Up is y axis
-void Matrix4f::InitCameraTransform(const Vector3f& Position, const Vector3f& Target, const Vector3f& Up) {
+void Matrix4f::init_camera_transform(const Vector3f& Position, const Vector3f& Target, const Vector3f& Up) {
     Vector3f Z = Target - Position;
-    Z.Normalize();
-    Vector3f X = Z.Cross(Up);
-    X.Normalize();
-    Vector3f Y = X.Cross(Z);
+    Z.normalize();
+    Vector3f X = Z.cross(Up);
+    X.normalize();
+    Vector3f Y = X.cross(Z);
     
-    auto x_t = -X.Dot(Position);
-    auto y_t = -Y.Dot(Position);
-    auto z_t = Z.Dot(Position);
+    auto x_t = -X.dot(Position);
+    auto y_t = -Y.dot(Position);
+    auto z_t = Z.dot(Position);
 
     m[0][0] = X.x; m[0][1] = X.y; m[0][2] = X.z; m[0][3] = x_t;
     m[1][0] = Y.x; m[1][1] = Y.y; m[1][2] = Y.z; m[1][3] = y_t;
@@ -389,7 +387,7 @@ void Matrix4f::InitCameraTransform(const Vector3f& Position, const Vector3f& Tar
     m[3][0] = 0.0f; m[3][1] = 0.0f; m[3][2] = 0.0f; m[3][3] = 1.0f;
 }
 
-void Matrix4f::InitPersProjTransform(const PersProjInfo& p) {
+void Matrix4f::init_pers_proj_transform(const PersProjInfo& p) {
     float ar = p.Width / p.Height;
     float zRange = p.zFar - p.zNear;  // flip sign for clarity
     float tanHalfFOV = tanf(ToRadian(p.FOV / 2.0f));
@@ -402,24 +400,12 @@ void Matrix4f::InitPersProjTransform(const PersProjInfo& p) {
     m[3][3] = 0.0f;
 }
 
-void Matrix4f::InitOrthoProjTransform(const OrthoProjInfo& p) {
-    InitIdentity();
+void Matrix4f::init_ortho_proj_transform(const OrthoProjInfo& p) {
+    init_identity();
     m[0][0] = 2.0f / (p.right - p.left);
     m[1][1] = 2.0f / (p.top - p.bottom);
     m[2][2] = -2.0f / (p.zFar - p.zNear);
     m[0][3] = -(p.right + p.left) / (p.right - p.left);
     m[1][3] = -(p.top + p.bottom) / (p.top - p.bottom);
     m[2][3] = -(p.zFar + p.zNear) / (p.zFar - p.zNear);
-}
-
-Vector3f operator+(const Vector3f& l, const Vector3f& r) {
-    return Vector3f(l.x + r.x, l.y + r.y, l.z + r.z);
-}
-
-Vector3f operator-(const Vector3f& l, const Vector3f& r) {
-    return Vector3f(l.x - r.x, l.y - r.y, l.z - r.z);
-}
-
-Vector3f operator*(const Vector3f& l, float f) {
-    return Vector3f(l.x * f, l.y * f, l.z * f);
 }

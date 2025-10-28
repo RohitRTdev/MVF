@@ -39,7 +39,7 @@ echo    CXX=%CXX%
 echo    PKG_CONFIG_PATH=%PKG_CONFIG_PATH%
 
 echo [INFO] Running build system...
-make -f scripts\Makefile
+make -f scripts\Makefile %*
 set MAKE_EXIT_CODE=!ERRORLEVEL!
 if !MAKE_EXIT_CODE! neq 0 (
     echo [INFO] Build failed...    

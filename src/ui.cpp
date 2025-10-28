@@ -5,74 +5,23 @@
 
 using namespace Gtk;
 
-GLWidget::GLWidget() {
-    set_hexpand(true);
-    set_vexpand(true);
-
-    signal_realize().connect(sigc::mem_fun(*this, &GLWidget::on_realize));
-    signal_render().connect(sigc::mem_fun(*this, &GLWidget::on_render), true);
-
-    _timeout_connection = Glib::signal_timeout().connect(
-        sigc::mem_fun(*this, &GLWidget::on_tick), 16);
-}
-
-GLWidget::~GLWidget() {
-    _timeout_connection.disconnect();
-}
-
-void GLWidget::on_realize() {
-    Gtk::GLArea::on_realize();
-
-    try {
-        make_current();
-        GLenum res = glewInit();
-        if (res != GLEW_OK) {
-            MVF::app_error(std::string("Error: ") + reinterpret_cast<const char*>(glewGetErrorString(res)));
-        }
-    } catch (const Gdk::GLError& gle) {
-        MVF::app_error(std::string("Failed to realize GLArea ") + gle.what());
-    }
-
-    glEnable(GL_DEPTH_TEST);
-}
-
-bool GLWidget::on_render(const Glib::RefPtr<Gdk::GLContext>& context) {
-    using clk = std::chrono::steady_clock;
-    double secs = std::chrono::duration<double>(clk::now() - _t0).count();
-
-    float r = 0.5f + 0.5f * std::sin(secs * 1.0);
-    float g = 0.5f + 0.5f * std::sin(secs * 1.7 + 2.0);
-    float b = 0.5f + 0.5f * std::sin(secs * 2.3 + 4.0);
-
-    glViewport(0, 0, get_allocated_width(), get_allocated_height());
-    glClearColor(r, g, b, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    return true;
-}
-
-bool GLWidget::on_tick() {
-    
-    queue_render();
-    return true; 
-}
-
-MainWindow::MainWindow() {
+MainWindow::MainWindow() : gl_handler(this) {
     extern MVF::ErrorBox main_error_box;
     
-    set_title("Test");
+    set_title("MVF");
     set_default_size(1024, 1024);
     main_error_box = MVF::ErrorBox(this, get_application().get());
 
     m_vbox.append(m_menubox);
     m_vbox.append(m_hbox);
     m_hbox.append(m_uibox);
-    m_hbox.append(m_glarea);
+    m_hbox.append(gl_handler);
 
     m_label.set_text("Controls / UI");
     m_uibox.append(m_label);
 
     m_button1.signal_clicked().connect(sigc::mem_fun(*this, &MainWindow::on_button1_clicked));
+    m_button1.set_label("Load");
     m_uibox.append(m_button1);
 
     auto file_open_btn = make_managed<Button>();
@@ -91,7 +40,12 @@ MainWindow::MainWindow() {
     file_open_btn->set_css_classes({"menu-button"});
     file_open_btn->set_has_frame(false);
     m_button1.set_css_classes({"ui-button"});
-    set_child(m_vbox); 
+    set_child(m_vbox);
+    
+    set_focusable(true); 
+    auto key_controller = Gtk::EventControllerKey::create();
+    key_controller->signal_key_pressed().connect(sigc::mem_fun(gl_handler, &MVF::RenderHandler::on_key_pressed), false);
+    add_controller(key_controller);
 
     signal_close_request().connect(sigc::mem_fun(*this, &MainWindow::on_window_close), false);
 }
@@ -196,14 +150,21 @@ bool MainWindow::file_load_handler() {
     if (bytes_read == loader->total_bytes) {
         loader->complete();
         progress_bar.hide();
-        std::cout << "Loaded VTK: " << loader->data.nx << " x " << loader->data.ny << " x " << loader->data.nz << " with fields:" << std::endl;
+#ifdef MVF_DEBUG
+        std::cout << "Loaded VTK: " << loader->data->nx << " x " << loader->data->ny << " x " << loader->data->nz << " with fields:" << std::endl;
 
-        for (auto& [key, val]: loader->data.scalars) {
+        for (auto& [key, val]: loader->data->scalars) {
             std::cout << key << " -> " << std::get<0>(val).size() << ", " << std::get<1>(val) << std::endl;
         }
 
-        std::cout << "Origin: " << loader->data.origin.x << ',' << loader->data.origin.y << ',' << loader->data.origin.z << std::endl;
-        std::cout << "Spacing: " << loader->data.spacing.x << ',' << loader->data.spacing.y << ',' << loader->data.spacing.z << std::endl;
+        std::cout << "Origin: " << loader->data->origin.x << ',' << loader->data->origin.y << ',' << loader->data->origin.z << std::endl;
+        std::cout << "Spacing: " << loader->data->spacing.x << ',' << loader->data->spacing.y << ',' << loader->data->spacing.z << std::endl;
+#endif           
+        gl_handler.make_current();
+        renderer.setup_scene(loader->data);
+        loaded_scene = true;
+        gl_handler.queue_render();
+
         return false;
     }
 
@@ -211,5 +172,5 @@ bool MainWindow::file_load_handler() {
 }
 
 void MainWindow::on_button1_clicked() {
-    m_label.set_text("Button 1 clicked");
+    m_label.set_text("Vector arrow glyph");
 }

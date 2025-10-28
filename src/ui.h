@@ -4,21 +4,8 @@
 #include <gtkmm.h>
 #include <GL/glew.h>
 #include "vtk.h"
-
-class GLWidget : public Gtk::GLArea
-{
-public:
-    GLWidget();
-    ~GLWidget();
-
-private:
-    bool on_render(const Glib::RefPtr<Gdk::GLContext>& context);
-    bool on_tick();
-    void on_realize();
-
-    sigc::connection _timeout_connection;
-    std::chrono::steady_clock::time_point _t0 = std::chrono::steady_clock::now();
-};
+#include "handler.h"
+#include "renderer.h"
 
 class OverlayProgressBar : public Gtk::Box {
 public:
@@ -37,11 +24,13 @@ public:
     MainWindow();
     virtual ~MainWindow() = default;
 
+    friend MVF::RenderHandler;
 private:
     void on_file_open();
     void on_button1_clicked();
     bool file_load_handler();
     bool on_window_close();
+    bool on_key_press();
 
     sigc::connection file_loader_conn;
     std::unique_ptr<MVF::LoadProxy> loader;
@@ -54,7 +43,9 @@ private:
     
     Gtk::Label m_label;
     Gtk::Button m_button1{"Button 1"};
-    GLWidget m_glarea;
+    MVF::RenderHandler gl_handler;
+    MVF::Renderer renderer;
+    bool loaded_scene = false;
 
     OverlayProgressBar progress_bar;
 };

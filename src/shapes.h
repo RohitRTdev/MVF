@@ -1,0 +1,59 @@
+#pragma once
+#include <vector>
+#include <cstdint>
+#include <array>
+#include "math_utils.h"
+#include "vtk.h"
+
+namespace MVF {
+#pragma pack(push, 1)
+    struct Vertex {
+        float x, y, z;
+
+        operator Vector3f() const {
+            return Vector3f(x, y, z);
+        }
+    };
+    
+    struct ArrowVertex {
+        float x, y, z; // Position
+        float u, v, w; // Normal
+    };
+
+    struct GlyphInstance {
+        Vector3f position;
+        Vector3f direction;
+        float scale;
+    };
+#pragma pack(pop)
+
+    struct ArrowMesh {
+        std::vector<ArrowVertex> vertices;
+        std::vector<uint32_t> indices;
+
+        ArrowMesh() = default;
+        ArrowMesh(float rad_cyl, float rad_cone, float len_cyl, float len_cone);    
+    private:
+        float radius_cylinder;
+        float radius_cone;
+        float length_cylinder;
+        float length_cone;
+
+        void compute_normals();
+    };
+
+    struct BoundingBox {
+        std::array<Vertex, 8> vertices;
+        std::array<uint32_t, 12 * 2> indices; // 12 lines each requiring 2 vertices
+
+        BoundingBox() = default;
+        BoundingBox(float xmin, float xmax, float ymin, float ymax, float zmin, float zmax);
+    };
+
+    struct GlyphMesh {
+        std::vector<GlyphInstance> points;
+
+        GlyphMesh() = default;
+        GlyphMesh(VolumeData* model);
+    };
+}
