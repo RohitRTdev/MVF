@@ -162,6 +162,13 @@ bool MainWindow::file_load_handler() {
 #endif           
         gl_handler.make_current();
         renderer.setup_scene(loader->data);
+        if (loader->data->scalars.size() >= 3) {
+            std::vector<std::string> keys;
+            for (auto& [key, _]: loader->data->scalars) {
+                keys.push_back(key);
+            }
+            renderer.entity.set_vector_mode(keys[0], keys[1], keys[2]);
+        }
         loaded_scene = true;
         gl_handler.queue_render();
 

@@ -16,6 +16,7 @@ namespace MVF {
         set_required_version(4, 6);
         set_has_depth_buffer(true);
         signal_realize().connect(sigc::mem_fun(*this, &RenderHandler::on_realize));
+        signal_unrealize().connect(sigc::mem_fun(*this, &RenderHandler::on_unrealize));
         signal_render().connect(sigc::mem_fun(*this, &RenderHandler::on_render), true);
         signal_resize().connect(sigc::mem_fun(*this, &RenderHandler::on_resize)); 
     }
@@ -47,6 +48,15 @@ namespace MVF {
         } catch (const Gdk::GLError& gle) {
             MVF::app_error(std::string("Failed to realize GLArea ") + gle.what());
         }
+    }
+    
+    void RenderHandler::on_unrealize() {
+#ifdef MVF_DEBUG
+        std::cout << "Unrealizing GL context..." << std::endl;
+#endif
+        Gtk::GLArea::on_unrealize();
+        
+        parent->renderer.entity.destroy_buffers();
     }
 
     bool RenderHandler::on_render(const Glib::RefPtr<Gdk::GLContext>& context) {

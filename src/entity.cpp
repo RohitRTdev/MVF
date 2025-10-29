@@ -14,12 +14,49 @@ namespace MVF {
     }
 
     void VolumeEntity::resync() {
+        create_vertex_array();
+        create_bounding_box_buffers();
         create_buffers();
     }
 
     void VolumeEntity::load_model(std::shared_ptr<VolumeData>& data) {
-        model = data; 
+        model = data;
+        if (!arrow_buffer.is_active) {
+            create_vertex_array();
+        } 
         init_model_space();
+        create_bounding_box_buffers();
+        type.mode = EntityMode::NONE;
+    }
+   
+    void VolumeEntity::destroy_buffers(bool destroy_static_buffers) {
+        if (arrow_buffer.is_active && destroy_static_buffers) {
+            glDeleteVertexArrays(1, &arrow_buffer.vao_vec_glyph);
+            glDeleteBuffers(2, std::array{arrow_buffer.vbo_arrow_mesh, arrow_buffer.ebo_arrow_mesh}.data());
+            arrow_buffer.is_active = false;
+        }
+
+        if (box_buffer.is_active) {
+            glDeleteVertexArrays(1, &box_buffer.vao_bound_box);
+            glDeleteBuffers(2, std::array{box_buffer.vbo_box, box_buffer.ebo_box}.data());
+        }
+
+        if (vec_buffer.is_active) {
+            glDeleteBuffers(1, &vec_buffer.vbo_glyph);
+        }
+
+        vec_buffer.is_active = false;
+        box_buffer.is_active = false;
+
+#ifdef MVF_DEBUG
+        std::cout << "Deleted all model buffers..." << std::endl;
+#endif
+    }
+    
+    void VolumeEntity::set_vector_mode(const std::string& field1, const std::string& field2, const std::string& field3) { 
+        type.mode = EntityMode::VECTOR_GLYPH;
+        type.data = VectorGlyphDesc{field1, field2, field3};
+
         create_buffers();
     }
 
@@ -32,16 +69,16 @@ namespace MVF {
             std::cout << "Initialized static meshes..." << std::endl;
 #endif
         }
-        
-        glGenVertexArrays(1, &vao_vec_glyph);
-        glBindVertexArray(vao_vec_glyph);
 
-        glGenBuffers(1, &vbo_arrow_mesh);
-        glGenBuffers(1, &ebo_arrow_mesh);
+        glGenVertexArrays(1, &arrow_buffer.vao_vec_glyph);
+        glBindVertexArray(arrow_buffer.vao_vec_glyph);
+
+        glGenBuffers(1, &arrow_buffer.vbo_arrow_mesh);
+        glGenBuffers(1, &arrow_buffer.ebo_arrow_mesh);
         
         // Create the buffer for arrow mesh
         // 3 position + 3 normal
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_arrow_mesh);
+        glBindBuffer(GL_ARRAY_BUFFER, arrow_buffer.vbo_arrow_mesh);
         glBufferData(GL_ARRAY_BUFFER, arrow_mesh.vertices.size() * sizeof(ArrowVertex), arrow_mesh.vertices.data(), GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(ArrowVertex), 0);
@@ -50,56 +87,78 @@ namespace MVF {
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(ArrowVertex), (void*)(3 * sizeof(float)));
         
         // Write the index/element buffer to GPU
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_arrow_mesh);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, arrow_buffer.ebo_arrow_mesh);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, arrow_mesh.indices.size() * sizeof(uint32_t), arrow_mesh.indices.data(), GL_STATIC_DRAW);
         
         // Unbind all the buffers
         glBindVertexArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        arrow_buffer.is_active = true;
+#ifdef MVF_DEBUG
+        std::cout << "Created static buffers..." << std::endl;
+#endif
     }
 
-    void VolumeEntity::create_buffers() {
-        glGenVertexArrays(1, &vao_bound_box);
-        glBindVertexArray(vao_bound_box);
+    void VolumeEntity::create_bounding_box_buffers() {
+        glGenVertexArrays(1, &box_buffer.vao_bound_box);
+        glBindVertexArray(box_buffer.vao_bound_box);
 
-        glGenBuffers(1, &vbo_box);
-        glGenBuffers(1, &ebo_box);
+        glGenBuffers(1, &box_buffer.vbo_box);
+        glGenBuffers(1, &box_buffer.ebo_box);
 
         // Create the buffer for bounding box
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_box);
+        glBindBuffer(GL_ARRAY_BUFFER, box_buffer.vbo_box);
         glBufferData(GL_ARRAY_BUFFER, box.vertices.size() * sizeof(Vertex), box.vertices.data(), GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
         
         // Write the index/element buffer to GPU
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_box);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, box_buffer.ebo_box);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, box.indices.size() * sizeof(uint32_t), box.indices.data(), GL_STATIC_DRAW);
-        
-        field_mesh = GlyphMesh(model.get());
 
-        glBindVertexArray(vao_vec_glyph);
-        glGenBuffers(1, &vbo_glyph);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_glyph);
-        glBufferData(GL_ARRAY_BUFFER, field_mesh.points.size() * sizeof(GlyphInstance), field_mesh.points.data(), GL_STATIC_DRAW);
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(GlyphInstance), 0);
-        glVertexAttribDivisor(2, 1);
-        
-        glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(GlyphInstance), (void*)(3 * sizeof(float)));
-        glVertexAttribDivisor(3, 1);
-        
-        glEnableVertexAttribArray(4);
-        glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(GlyphInstance), (void*)(6 * sizeof(float)));
-        glVertexAttribDivisor(4, 1);
-        
         // Unbind all the buffers
         glBindVertexArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+        box_buffer.is_active = true;
+
 #ifdef MVF_DEBUG
-        std::cout << "Created model buffers..." << std::endl;
+        std::cout << "Created bounding box buffers..." << std::endl;
 #endif
+    }
+
+    void VolumeEntity::create_buffers() {
+        if (type.mode == EntityMode::VECTOR_GLYPH) {
+            auto& desc = std::get<VectorGlyphDesc>(type.data); 
+            field_mesh = GlyphMesh(model.get(), desc.field1, desc.field2, desc.field3);
+
+            glBindVertexArray(arrow_buffer.vao_vec_glyph);
+            glGenBuffers(1, &vec_buffer.vbo_glyph);
+            glBindBuffer(GL_ARRAY_BUFFER, vec_buffer.vbo_glyph);
+            glBufferData(GL_ARRAY_BUFFER, field_mesh.points.size() * sizeof(GlyphInstance), field_mesh.points.data(), GL_STATIC_DRAW);
+            glEnableVertexAttribArray(2);
+            glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(GlyphInstance), 0);
+            glVertexAttribDivisor(2, 1);
+            
+            glEnableVertexAttribArray(3);
+            glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(GlyphInstance), (void*)(3 * sizeof(float)));
+            glVertexAttribDivisor(3, 1);
+            
+            glEnableVertexAttribArray(4);
+            glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(GlyphInstance), (void*)(6 * sizeof(float)));
+            glVertexAttribDivisor(4, 1);
+            
+            // Unbind all the buffers
+            glBindVertexArray(0);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+            vec_buffer.is_active = true;
+
+    #ifdef MVF_DEBUG
+            std::cout << "Created model buffers..." << std::endl;
+    #endif
+        }
     } 
 
     void VolumeEntity::draw() {
@@ -107,13 +166,15 @@ namespace MVF {
 		auto pipeline_vec = reinterpret_cast<VecGlyphPipeline*>(pipelines[static_cast<int>(PipelineType::VEC_GLYPH)]);
 		
         glUseProgram(pipeline_box->shader_program);
-        glBindVertexArray(vao_bound_box);
+        glBindVertexArray(box_buffer.vao_bound_box);
         glDrawElements(GL_LINES, box.indices.size(), GL_UNSIGNED_INT, 0);
 
-        glUseProgram(pipeline_vec->shader_program);
-        glBindVertexArray(vao_vec_glyph);
-        glDrawElementsInstanced(GL_TRIANGLES, arrow_mesh.indices.size(), GL_UNSIGNED_INT, 0, field_mesh.points.size());
-        glBindVertexArray(0);
+        if (type.mode == EntityMode::VECTOR_GLYPH) {
+            glUseProgram(pipeline_vec->shader_program);
+            glBindVertexArray(arrow_buffer.vao_vec_glyph);
+            glDrawElementsInstanced(GL_TRIANGLES, arrow_mesh.indices.size(), GL_UNSIGNED_INT, 0, field_mesh.points.size());
+            glBindVertexArray(0);
+        }
     }
 
     void VolumeEntity::compute_bounding_box() {

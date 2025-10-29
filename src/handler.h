@@ -15,6 +15,7 @@ namespace MVF {
         bool on_tick();
         void on_resize(int width, int height);
         void on_realize();
+        void on_unrealize(); 
         bool on_key_pressed(guint keyval, guint keycode, Gdk::ModifierType state);
     };
 }

@@ -1,14 +1,35 @@
 #pragma once
 
+#include <variant>
 #include "vtk.h"
 #include "math_utils.h"
 #include "shapes.h"
+
+
+enum class EntityMode {
+    NONE,
+    VECTOR_GLYPH
+};
+
+struct VectorGlyphDesc {
+    std::string field1;
+    std::string field2;
+    std::string field3;
+};
+
+using EntityData = std::variant<VectorGlyphDesc>;
+
+struct EntityRepresentation {
+    EntityMode mode;
+    EntityData data;
+};
 
 namespace MVF {
     class Renderer;
 
     class Entity {
     public:
+        
         virtual void rotate(float angleX, float angleY, float angleZ);
         virtual void translate(float x, float y, float z);
         virtual Vector3f get_position();
@@ -25,24 +46,42 @@ namespace MVF {
     };
 
     class VolumeEntity : public Entity { 
+        struct ArrowBufferEntity {
+            bool is_active = false;
+            GLuint vao_vec_glyph, vbo_arrow_mesh, ebo_arrow_mesh;
+        };
+        
+        struct BoxBufferEntity {
+            bool is_active = false;
+            GLuint vao_bound_box, vbo_box, ebo_box;
+        };
+
+        struct VectorBufferEntity {
+            bool is_active = false;
+            GLuint vbo_glyph;
+        };
+
     public:
         VolumeEntity();
         void load_model(std::shared_ptr<VolumeData>& data);
+        void destroy_buffers(bool destroy_static_buffers = true);
         void switch_field();
+        void set_vector_mode(const std::string& field1, const std::string& field2, const std::string& field3);
         void scale(float factor);
         void resync();
         friend Renderer;
     
     private:
-        std::shared_ptr<VolumeData> model;    
+        std::shared_ptr<VolumeData> model;
+        EntityRepresentation type;    
         BoundingBox box; 
         ArrowMesh arrow_mesh;
         GlyphMesh field_mesh;
         Matrix4f init_transform;
         Matrix4f scale_transform;
-        GLuint vao_vec_glyph, vao_bound_box;
-        GLuint vbo_arrow_mesh, vbo_box, vbo_glyph;
-        GLuint ebo_arrow_mesh, ebo_box;
+        ArrowBufferEntity arrow_buffer;
+        BoxBufferEntity box_buffer;
+        VectorBufferEntity vec_buffer;
 
         bool initialized = false;
 
@@ -53,6 +92,7 @@ namespace MVF {
         void init();
         void init_model_space();
         void create_vertex_array();
+        void create_bounding_box_buffers(); 
         void create_buffers();
 
         void draw() override;

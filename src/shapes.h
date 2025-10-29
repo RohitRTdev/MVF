@@ -2,6 +2,7 @@
 #include <vector>
 #include <cstdint>
 #include <array>
+#include <string>
 #include "math_utils.h"
 #include "vtk.h"
 
@@ -54,6 +55,6 @@ namespace MVF {
         std::vector<GlyphInstance> points;
 
         GlyphMesh() = default;
-        GlyphMesh(VolumeData* model);
+        GlyphMesh(VolumeData* model, const std::string& field1, const std::string& field2, const std::string& field3);
     };
 }

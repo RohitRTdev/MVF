@@ -34,6 +34,7 @@ namespace MVF {
 	}
 
 	void Renderer::setup_scene(std::shared_ptr<VolumeData>& data) {
+		purge_scene();
 		entity.load_model(data);
 		
 		// Get the minimum clipping box that can enclose the mesh
@@ -67,6 +68,15 @@ namespace MVF {
 		
 		is_scene_setup = true;	
 	}
+	
+	void Renderer::purge_scene() {
+		if (!is_scene_setup) {
+			return;
+		}
+
+		entity.destroy_buffers(false);
+		is_scene_setup = false;
+	} 
 
 	void Renderer::set_viewport(int width, int height) {
 		glViewport(0, 0, width, height);

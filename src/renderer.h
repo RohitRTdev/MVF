@@ -17,6 +17,7 @@ namespace MVF {
         void init(int width, int height);
         void set_viewport(int width, int height);
         void setup_scene(std::shared_ptr<VolumeData>& data);
+        void purge_scene(); 
         void render();
         
     private:

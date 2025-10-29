@@ -89,7 +89,7 @@ namespace MVF {
         };
     }
 
-    GlyphMesh::GlyphMesh(VolumeData* model) {
+    GlyphMesh::GlyphMesh(VolumeData* model, const std::string& field1, const std::string& field2, const std::string& field3) {
         size_t sample_point = 0;
         float max_wgt = 0;
 
@@ -107,9 +107,9 @@ namespace MVF {
                         continue;
                     }
                     auto x = model->origin.x + k * model->spacing.x;
-                    auto u_pt = std::get<0>(model->scalars["U"])[i * model->ny * model->nx + j * model->nx + k];  
-                    auto v_pt = std::get<0>(model->scalars["V"])[i * model->ny * model->nx + j * model->nx + k];  
-                    auto w_pt = std::get<0>(model->scalars["W"])[i * model->ny * model->nx + j * model->nx + k];  
+                    auto u_pt = std::get<0>(model->scalars[field1])[i * model->ny * model->nx + j * model->nx + k];  
+                    auto v_pt = std::get<0>(model->scalars[field2])[i * model->ny * model->nx + j * model->nx + k];  
+                    auto w_pt = std::get<0>(model->scalars[field3])[i * model->ny * model->nx + j * model->nx + k];  
                     points.push_back(GlyphInstance{Vector3f(x, y, z), Vector3f(u_pt, v_pt, w_pt)});
 
                     max_wgt = std::max(max_wgt, wgt_fn(u_pt, v_pt, w_pt));
