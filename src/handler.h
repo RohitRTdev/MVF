@@ -1,16 +1,19 @@
 #pragma once
 #include <gtkmm.h>
+#include "renderer.h"
 
 class MainWindow;
 
 namespace MVF {
     class RenderHandler : public Gtk::GLArea {
     public:
-        RenderHandler(MainWindow* parent);
+        RenderHandler(Renderer* renderer, bool is_spatial_handler = true);
    
         friend MainWindow;
     private:
-        MainWindow* parent;
+        Renderer* renderer;
+        bool is_spatial_renderer;
+        static bool initialized_glew;
         bool on_render(const Glib::RefPtr<Gdk::GLContext>& context);
         bool on_tick();
         void on_resize(int width, int height);

@@ -14,12 +14,8 @@ namespace MVF {
 	light(Vector3f(0.0f, 0.0f, 0.0f), Vector3f(1.0f, 1.0f, 1.0f)) {
 
 	}
-	
-	void Renderer::init(int width, int height) {
-		Pipeline::init_pipelines();
-		entity.init();	
 
-		glClearColor(0.25f, 0.25f, 0.27f, 1.0f);
+	void Renderer::init(int width, int height) {
 		glEnable(GL_DEPTH_TEST); 
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -32,8 +28,27 @@ namespace MVF {
 		}, nullptr);
 #endif
 	}
+        
+	void SpatialRenderer::resync() {
+		if (!is_scene_setup) {
+			return;
+		}	
 
-	void Renderer::setup_scene(std::shared_ptr<VolumeData>& data) {
+		entity.resync();
+	}
+	
+	void SpatialRenderer::unload() {
+		entity.destroy_buffers();
+	}
+
+	void SpatialRenderer::init(int width, int height) {
+		Renderer::init(width, height);
+		glClearColor(0.25f, 0.25f, 0.27f, 1.0f);
+		pipelines = Pipeline::init_pipelines();
+		entity.init(pipelines);	
+	}
+
+	void SpatialRenderer::setup_scene(std::shared_ptr<VolumeData>& data) {
 		purge_scene();
 		entity.load_model(data);
 		
@@ -69,7 +84,7 @@ namespace MVF {
 		is_scene_setup = true;	
 	}
 	
-	void Renderer::purge_scene() {
+	void SpatialRenderer::purge_scene() {
 		if (!is_scene_setup) {
 			return;
 		}
@@ -84,7 +99,7 @@ namespace MVF {
 		this->height = height;
 	}
 
-	void Renderer::render() {
+	void SpatialRenderer::render() {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		if(!is_scene_setup) {

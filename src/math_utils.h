@@ -25,6 +25,10 @@ struct Vector2f {
     float y;
     Vector2f();
     Vector2f(float _x, float _y);
+    Vector2f operator+(const Vector2f& r) const;
+    Vector2f operator-(const Vector2f& r) const;
+    Vector2f operator*(float f) const;
+    Vector2f& normalize();
 };
 
 struct Vector3f {

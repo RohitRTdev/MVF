@@ -5,8 +5,9 @@
 
 namespace MVF {
     enum class PipelineType {
-        VEC_GLYPH,
-        BOX
+        VEC_GLYPH = 0,
+        BOX,
+        AXIS = 0
     };
 
     struct Pipeline {
@@ -17,7 +18,7 @@ namespace MVF {
         Pipeline(const std::string& vs_file, const std::string& fs_file, PipelineType type);
         Pipeline(const std::string& vs_file, const std::string& gs_file, const std::string& fs_file, PipelineType type);
 
-        static void init_pipelines();
+        static std::vector<Pipeline*> init_pipelines(bool is_spatial_pipeline = true);
 
     protected:
         GLuint get_uniform_var(const std::string& var_name); 
@@ -39,6 +40,8 @@ namespace MVF {
         
         BoxPipeline();    
     };
+    
+    struct AxisPipeline : Pipeline {
+        AxisPipeline();    
+    };
 }
-
-extern std::vector<MVF::Pipeline*> pipelines;

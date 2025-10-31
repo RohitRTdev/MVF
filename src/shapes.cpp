@@ -136,5 +136,62 @@ namespace MVF {
             }
         }
     }
+    
+    void Axis::push_line_quad(Vector2f& a, Vector2f& b, float thickness) {
+        Vector2f dir = (b - a).normalize();
+        Vector2f n(-dir.y, dir.x); 
+        n = n * thickness * 0.5f;
+
+        auto v0 = a - n;
+        auto v1 = a + n;
+        auto v2 = b + n;
+        auto v3 = b - n;
+
+        vertices.push_back(v0);
+        vertices.push_back(v1);
+        vertices.push_back(v2);
+        vertices.push_back(v0);
+        vertices.push_back(v2);
+        vertices.push_back(v3);
+    }
+
+    void Axis::push_arrow(Vector2f& base, Vector2f& dir, float length, float width) {
+        auto n = Vector2f(-dir.y, dir.x);
+        auto tip = base + dir * length;
+        auto v0 = tip;
+        auto v1 = base + n * (width * 0.5f);
+        auto v2 = base - n * (width * 0.5f);
+
+        vertices.push_back(v0);
+        vertices.push_back(v1);
+        vertices.push_back(v2);
+    }
+
+    Axis::Axis(int tick_count, float axis_len, float axis_thickness, float tick_size) {
+        float half_l = axis_len * 0.5f;
+        Vector2f left(-half_l, 0.0f);
+        Vector2f right(half_l, 0.0f);
+
+        // Main axis line
+        push_line_quad(left, right, axis_thickness);
+
+        // Ticks
+        for (int i = 0; i <= tick_count; i++) {
+            float t = (float)i / (float)tick_count;
+            float x = -half_l + t * axis_len;
+            Vector2f a(x, -tick_size * 0.5f);
+            Vector2f b(x, tick_size * 0.5f);
+            push_line_quad(a, b, axis_thickness * 0.5f);
+        }
+
+        // Arrows
+        Vector2f dir_right(1, 0);
+        Vector2f dir_left(-1, 0);
+        float arrow_len = 0.07f;
+        float arrow_width = 0.06f;
+
+        push_arrow(right, dir_right, arrow_len, arrow_width);
+        push_arrow(left, dir_left, arrow_len, arrow_width);
+    }
 }
 

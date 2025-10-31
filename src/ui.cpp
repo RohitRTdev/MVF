@@ -5,7 +5,7 @@
 
 using namespace Gtk;
 
-MainWindow::MainWindow() : gl_handler(this) {
+MainWindow::MainWindow() : spatial_handler(&spatial_renderer), attrib_handler(&attrib_renderer, false) {
     extern MVF::ErrorBox main_error_box;
     
     set_title("MVF");
@@ -15,7 +15,11 @@ MainWindow::MainWindow() : gl_handler(this) {
     m_vbox.append(m_menubox);
     m_vbox.append(m_hbox);
     m_hbox.append(m_uibox);
-    m_hbox.append(gl_handler);
+
+    auto pane = make_managed<Paned>();
+    pane->set_start_child(spatial_handler);
+    pane->set_end_child(attrib_handler);
+    m_hbox.append(*pane);
 
     m_label.set_text("Controls / UI");
     m_uibox.append(m_label);
@@ -44,7 +48,7 @@ MainWindow::MainWindow() : gl_handler(this) {
     
     set_focusable(true); 
     auto key_controller = Gtk::EventControllerKey::create();
-    key_controller->signal_key_pressed().connect(sigc::mem_fun(gl_handler, &MVF::RenderHandler::on_key_pressed), false);
+    key_controller->signal_key_pressed().connect(sigc::mem_fun(spatial_handler, &MVF::RenderHandler::on_key_pressed), false);
     add_controller(key_controller);
 
     signal_close_request().connect(sigc::mem_fun(*this, &MainWindow::on_window_close), false);
@@ -160,17 +164,17 @@ bool MainWindow::file_load_handler() {
         std::cout << "Origin: " << loader->data->origin.x << ',' << loader->data->origin.y << ',' << loader->data->origin.z << std::endl;
         std::cout << "Spacing: " << loader->data->spacing.x << ',' << loader->data->spacing.y << ',' << loader->data->spacing.z << std::endl;
 #endif           
-        gl_handler.make_current();
-        renderer.setup_scene(loader->data);
+        spatial_handler.make_current();
+        spatial_renderer.setup_scene(loader->data);
         if (loader->data->scalars.size() >= 3) {
             std::vector<std::string> keys;
             for (auto& [key, _]: loader->data->scalars) {
                 keys.push_back(key);
             }
-            renderer.entity.set_vector_mode(keys[0], keys[1], keys[2]);
+            spatial_renderer.entity.set_vector_mode(keys[0], keys[1], keys[2]);
         }
         loaded_scene = true;
-        gl_handler.queue_render();
+        spatial_handler.queue_render();
 
         return false;
     }

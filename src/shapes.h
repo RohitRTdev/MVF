@@ -57,4 +57,15 @@ namespace MVF {
         GlyphMesh() = default;
         GlyphMesh(VolumeData* model, const std::string& field1, const std::string& field2, const std::string& field3);
     };
+
+    struct Axis {
+        std::vector<Vector2f> vertices;
+
+        Axis() = default;
+        Axis(int tick_count, float axis_len, float axis_thickness, float tick_size);
+    
+    private:
+        void push_line_quad(Vector2f& a, Vector2f& b, float thickness);
+        void push_arrow(Vector2f& base, Vector2f& dir, float length, float width);
+    };
 }

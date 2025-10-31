@@ -43,8 +43,9 @@ private:
     
     Gtk::Label m_label;
     Gtk::Button m_button1{"Button 1"};
-    MVF::RenderHandler gl_handler;
-    MVF::Renderer renderer;
+    MVF::RenderHandler spatial_handler, attrib_handler;
+    MVF::SpatialRenderer spatial_renderer;
+    MVF::AttribRenderer attrib_renderer;
     bool loaded_scene = false;
 
     OverlayProgressBar progress_bar;

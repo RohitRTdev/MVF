@@ -4,7 +4,7 @@
 #include "vtk.h"
 #include "math_utils.h"
 #include "shapes.h"
-
+#include "pipeline.h"
 
 enum class EntityMode {
     NONE,
@@ -25,7 +25,7 @@ struct EntityRepresentation {
 };
 
 namespace MVF {
-    class Renderer;
+    class SpatialRenderer;
 
     class Entity {
     public:
@@ -35,7 +35,7 @@ namespace MVF {
         virtual Vector3f get_position();
 
         Entity(const Vector3f& position);
-        friend Renderer;
+        friend SpatialRenderer;
     protected:
         Matrix4f world;
         Vector3f position; 
@@ -69,7 +69,7 @@ namespace MVF {
         void set_vector_mode(const std::string& field1, const std::string& field2, const std::string& field3);
         void scale(float factor);
         void resync();
-        friend Renderer;
+        friend SpatialRenderer;
     
     private:
         std::shared_ptr<VolumeData> model;
@@ -86,10 +86,11 @@ namespace MVF {
         bool initialized = false;
 
         std::vector<std::string> fields;
+        std::vector<Pipeline*> pipelines;
         int selectedField = -1;
 
         void compute_bounding_box();
-        void init();
+        void init(std::vector<Pipeline*>& pipelines);
         void init_model_space();
         void create_vertex_array();
         void create_bounding_box_buffers(); 
@@ -104,7 +105,7 @@ namespace MVF {
         void translate(float x, float y, float z) override;
         void rotate(float angleX, float angleY, float angleZ) override;
 
-        friend Renderer;
+        friend SpatialRenderer;
     private:
         Vector3f target;
         Vector3f up;

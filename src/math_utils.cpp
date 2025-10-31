@@ -5,6 +5,24 @@
 Vector2f::Vector2f() {}
 Vector2f::Vector2f(float _x, float _y) : x(_x), y(_y) {}
 
+Vector2f Vector2f::operator+(const Vector2f& r) const {
+    return Vector2f(x + r.x, y + r.y);
+}
+
+Vector2f Vector2f::operator-(const Vector2f& r) const {
+    return Vector2f(x - r.x, y - r.y);
+}
+
+Vector2f Vector2f::operator*(float f) const {
+    return Vector2f(x * f, y * f);
+}
+
+Vector2f& Vector2f::normalize() {
+    float Length = sqrtf(x * x + y * y);
+    x /= Length; y /= Length;
+    return *this;
+}
+
 Vector3f::Vector3f() {}
 Vector3f::Vector3f(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
 Vector3f::Vector3f(float f) : x(f), y(f), z(f) {}

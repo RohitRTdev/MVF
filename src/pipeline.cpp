@@ -2,8 +2,6 @@
 #include "error.h"
 #include "pipeline.h"
 
-std::vector<MVF::Pipeline*> pipelines;
-
 namespace MVF{
     Pipeline::Pipeline(PipelineType type) : type(type) {
         shader_program = glCreateProgram();
@@ -115,13 +113,26 @@ namespace MVF{
     BoxPipeline::BoxPipeline() : Pipeline("shaders/box.vs", "shaders/box.fs", PipelineType::BOX) {
         uMVP = get_uniform_var("uMVP");
     }  
+        
+    AxisPipeline::AxisPipeline() : Pipeline("shaders/axis.vs", "shaders/axis.fs", PipelineType::AXIS) 
+    {}
 
-    void Pipeline::init_pipelines() {
-        // *This must follow the same order as of the PipelineType enum class*
-        pipelines.assign({new VecGlyphPipeline(), new BoxPipeline()});
-    
+    std::vector<Pipeline*> Pipeline::init_pipelines(bool is_spatial_pipeline) {
+        std::vector<Pipeline*> pipelines;
+        if (is_spatial_pipeline) {
+            // *This must follow the same order as of the PipelineType enum class*
+            pipelines = {new VecGlyphPipeline(), new BoxPipeline()};
 #ifdef MVF_DEBUG
-        std::cout << "Recreated " << pipelines.size() << " pipelines" << std::endl;
+        std::cout << "Created spatial pipeline of size: " << pipelines.size() << std::endl;
 #endif
+        }
+        else {
+            pipelines = {new AxisPipeline()};
+#ifdef MVF_DEBUG
+        std::cout << "Created attribute pipeline of size: " << pipelines.size() << std::endl;
+#endif
+        } 
+
+        return pipelines;
     }
 }

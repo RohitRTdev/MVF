@@ -3,13 +3,13 @@
 
 #include "entity.h"
 #include "math_utils.h"
-#include "pipeline.h"
 
 namespace MVF {
     VolumeEntity::VolumeEntity() : Entity(Vector3f(0.0)) 
     {}
 
-    void VolumeEntity::init() {
+    void VolumeEntity::init(std::vector<Pipeline*>& pipelines) {
+        this->pipelines = pipelines;
         create_vertex_array();
     }
 

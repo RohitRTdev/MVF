@@ -9,7 +9,8 @@ float current_zoom = 1.0f;
 constexpr float ZOOM_FACTOR = 0.01f;
 
 namespace MVF {
-    RenderHandler::RenderHandler(MainWindow* parent) : parent(parent) {
+    bool RenderHandler::initialized_glew = false;
+    RenderHandler::RenderHandler(Renderer* renderer, bool is_spatial_handler) : renderer(renderer), is_spatial_renderer(is_spatial_handler) {
         set_hexpand(true);
         set_vexpand(true);
 
@@ -22,11 +23,8 @@ namespace MVF {
     }
 
     void RenderHandler::on_resize(int width, int height) {
-#ifdef MVF_DEBUG
-        std::cout << "GLArea resized to " << width << "x" << height << std::endl;
-#endif
         make_current();
-        parent->renderer.set_viewport(width, height);
+        renderer->set_viewport(width, height);
     }
 
     void RenderHandler::on_realize() {
@@ -34,17 +32,20 @@ namespace MVF {
 
         try {
             make_current();
-            GLenum res = glewInit();
-            if (res != GLEW_OK) {
-                MVF::app_error(std::string("Error: ") + reinterpret_cast<const char*>(glewGetErrorString(res)));
+            if (!initialized_glew) {
+                GLenum res = glewInit();
+                if (res != GLEW_OK) {
+                    MVF::app_error(std::string("Error: ") + reinterpret_cast<const char*>(glewGetErrorString(res)));
+                }
+
+                initialized_glew = true;
             }
-            parent->renderer.init(get_allocated_width(), get_allocated_height());
             
+            std::cout << "Realizing GLArea..." << std::endl;
+            renderer->init(get_allocated_width(), get_allocated_height()); 
             // This is needed since gtk might realize and unrealize the context multiple times
             // We need to then recreate the buffers
-            if (parent->loaded_scene) {
-                parent->renderer.entity.resync();
-            }
+            renderer->resync();
         } catch (const Gdk::GLError& gle) {
             MVF::app_error(std::string("Failed to realize GLArea ") + gle.what());
         }
@@ -56,53 +57,55 @@ namespace MVF {
 #endif
         Gtk::GLArea::on_unrealize();
         
-        parent->renderer.entity.destroy_buffers();
+        renderer->unload();
     }
 
     bool RenderHandler::on_render(const Glib::RefPtr<Gdk::GLContext>& context) {
-        parent->renderer.render();
+        renderer->render();
         return true;
     }
 
     bool RenderHandler::on_key_pressed(guint keyval, guint keycode, Gdk::ModifierType state) {
-        if (state != Gdk::ModifierType::NO_MODIFIER_MASK) {
+        if (state != Gdk::ModifierType::NO_MODIFIER_MASK || !is_spatial_renderer) {
             return false;
         }
 
+        auto spatial_renderer = static_cast<SpatialRenderer*>(renderer);
+
         switch(keyval) { 
             case GDK_KEY_w: {
-                parent->renderer.entity.rotate(ROTATION_FACTOR, 0, 0);
+                spatial_renderer->entity.rotate(ROTATION_FACTOR, 0, 0);
                 break;
             }
             case GDK_KEY_s: {
-                parent->renderer.entity.rotate(-ROTATION_FACTOR, 0, 0);
+                spatial_renderer->entity.rotate(-ROTATION_FACTOR, 0, 0);
                 break;
 
             }
             case GDK_KEY_a: {
-                parent->renderer.entity.rotate(0, 0, ROTATION_FACTOR);
+                spatial_renderer->entity.rotate(0, 0, ROTATION_FACTOR);
                 break;
             }
             case GDK_KEY_d: {
-                parent->renderer.entity.rotate(0, 0, -ROTATION_FACTOR);
+                spatial_renderer->entity.rotate(0, 0, -ROTATION_FACTOR);
                 break;
             }
             case GDK_KEY_q: {
-                parent->renderer.entity.rotate(0, ROTATION_FACTOR, 0);
+                spatial_renderer->entity.rotate(0, ROTATION_FACTOR, 0);
                 break;
             }
             case GDK_KEY_e: {
-                parent->renderer.entity.rotate(0, -ROTATION_FACTOR, 0);
+                spatial_renderer->entity.rotate(0, -ROTATION_FACTOR, 0);
                 break;
             }
             case GDK_KEY_z: {
                 current_zoom += ZOOM_FACTOR;
-                parent->renderer.entity.scale(current_zoom);
+                spatial_renderer->entity.scale(current_zoom);
                 break;
             }
             case GDK_KEY_x: {
                 current_zoom -= ZOOM_FACTOR;
-                parent->renderer.entity.scale(current_zoom);
+                spatial_renderer->entity.scale(current_zoom);
                 break;
             }
             default: return false;
