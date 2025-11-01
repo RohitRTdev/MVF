@@ -5,6 +5,7 @@
 
 #include "entity.h"
 #include "math_utils.h"
+#include "attrib.h"
 
 namespace MVF {
     class Renderer {
@@ -51,9 +52,15 @@ namespace MVF {
         void render() override;
         void resync() override;
     
+        void set_field_data(std::shared_ptr<VolumeData>& vol);
+        void set_attrib_space_dim(const std::vector<AxisDesc>& descriptors);
+
     private:
-        Axis axis_mesh;
-        GLuint VAO, VBO;
+        Axis axis_mesh_x, axis_mesh_y;
+        GLuint vao_x_axis, vao_y_axis, vbo_x_axis, vbo_y_axis;
+        std::shared_ptr<VolumeData> data;
+        std::vector<AxisDesc> descriptors;
+        std::optional<Trait> sel_trait;
         void setup_buffers(); 
     };
 }

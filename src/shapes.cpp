@@ -167,31 +167,47 @@ namespace MVF {
         vertices.push_back(v2);
     }
 
-    Axis::Axis(int tick_count, float axis_len, float axis_thickness, float tick_size) {
+    Axis::Axis(int tick_count, float axis_len, float axis_thickness, float tick_size, bool is_x_axis) {
         float half_l = axis_len * 0.5f;
-        Vector2f left(-half_l, 0.0f);
-        Vector2f right(half_l, 0.0f);
+        Vector2f ep1(-half_l, 0.0f);
+        Vector2f ep2(half_l, 0.0f);
+
+        if (!is_x_axis) {
+            ep1 = Vector2f(0.0f, half_l);
+            ep2 = Vector2f(0.0f, -half_l);
+        }
 
         // Main axis line
-        push_line_quad(left, right, axis_thickness);
+        push_line_quad(ep1, ep2, axis_thickness);
 
         // Ticks
         for (int i = 0; i <= tick_count; i++) {
-            float t = (float)i / (float)tick_count;
-            float x = -half_l + t * axis_len;
-            Vector2f a(x, -tick_size * 0.5f);
-            Vector2f b(x, tick_size * 0.5f);
+            float t = static_cast<float>(i) / tick_count;
+            float pt = -half_l + t * axis_len;
+            Vector2f a(pt, -tick_size * 0.5f);
+            Vector2f b(pt, tick_size * 0.5f);
+            if (!is_x_axis) {
+                a = Vector2f(-tick_size * 0.5f, pt);
+                b = Vector2f(tick_size * 0.5f, pt);
+            }
+
             push_line_quad(a, b, axis_thickness * 0.5f);
         }
 
         // Arrows
-        Vector2f dir_right(1, 0);
-        Vector2f dir_left(-1, 0);
+        Vector2f dir_ep1(-1, 0);
+        Vector2f dir_ep2(1, 0);
+
+        if (!is_x_axis) {
+            dir_ep1 = Vector2f(0, 1);
+            dir_ep2 = Vector2f(0, -1);
+        }
+
         float arrow_len = 0.07f;
         float arrow_width = 0.06f;
 
-        push_arrow(right, dir_right, arrow_len, arrow_width);
-        push_arrow(left, dir_left, arrow_len, arrow_width);
+        push_arrow(ep1, dir_ep1, arrow_len, arrow_width);
+        push_arrow(ep2, dir_ep2, arrow_len, arrow_width);
     }
 }
 

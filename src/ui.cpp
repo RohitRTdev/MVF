@@ -2,6 +2,7 @@
 #include "ui.h"
 #include "vtk.h"
 #include "error.h"
+#include "attrib.h"
 
 using namespace Gtk;
 
@@ -166,15 +167,19 @@ bool MainWindow::file_load_handler() {
 #endif           
         spatial_handler.make_current();
         spatial_renderer.setup_scene(loader->data);
+        attrib_renderer.set_field_data(loader->data);
+        std::vector<MVF::AxisDesc> desc(1);
         if (loader->data->scalars.size() >= 3) {
             std::vector<std::string> keys;
             for (auto& [key, _]: loader->data->scalars) {
                 keys.push_back(key);
             }
             spatial_renderer.entity.set_vector_mode(keys[0], keys[1], keys[2]);
+            desc.push_back(MVF::AxisDesc{});
         }
-        loaded_scene = true;
         spatial_handler.queue_render();
+        attrib_renderer.set_attrib_space_dim(desc);
+        attrib_handler.queue_render();
 
         return false;
     }

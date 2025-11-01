@@ -62,7 +62,7 @@ namespace MVF {
         std::vector<Vector2f> vertices;
 
         Axis() = default;
-        Axis(int tick_count, float axis_len, float axis_thickness, float tick_size);
+        Axis(int tick_count, float axis_len, float axis_thickness, float tick_size, bool is_horizontal);
     
     private:
         void push_line_quad(Vector2f& a, Vector2f& b, float thickness);

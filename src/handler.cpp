@@ -23,7 +23,6 @@ namespace MVF {
     }
 
     void RenderHandler::on_resize(int width, int height) {
-        make_current();
         renderer->set_viewport(width, height);
     }
 

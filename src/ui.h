@@ -46,7 +46,6 @@ private:
     MVF::RenderHandler spatial_handler, attrib_handler;
     MVF::SpatialRenderer spatial_renderer;
     MVF::AttribRenderer attrib_renderer;
-    bool loaded_scene = false;
 
     OverlayProgressBar progress_bar;
 };
