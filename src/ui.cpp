@@ -6,7 +6,8 @@
 
 using namespace Gtk;
 
-MainWindow::MainWindow() : spatial_handler(&spatial_renderer), attrib_handler(&attrib_renderer, false) {
+MainWindow::MainWindow() : spatial_handler(&spatial_renderer), attrib_handler(&attrib_renderer, false), 
+spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     extern MVF::ErrorBox main_error_box;
     
     set_title("MVF");
@@ -22,12 +23,10 @@ MainWindow::MainWindow() : spatial_handler(&spatial_renderer), attrib_handler(&a
     pane->set_end_child(attrib_handler);
     m_hbox.append(*pane);
 
-    m_label.set_text("Controls / UI");
-    m_uibox.append(m_label);
-
-    m_button1.signal_clicked().connect(sigc::mem_fun(*this, &MainWindow::on_button1_clicked));
-    m_button1.set_label("Load");
-    m_uibox.append(m_button1);
+    spatial_panel.set_vexpand(true);
+    attrib_panel.set_vexpand(true);
+    m_uibox.append(spatial_panel);
+    m_uibox.append(attrib_panel);
 
     auto file_open_btn = make_managed<Button>();
     auto file_open_icon = make_managed<Image>("assets/file-open.png"); 
@@ -35,16 +34,12 @@ MainWindow::MainWindow() : spatial_handler(&spatial_renderer), attrib_handler(&a
     file_open_btn->signal_clicked().connect(sigc::mem_fun(*this, &MainWindow::on_file_open));
     m_menubox.append(*file_open_btn);
 
-    auto spacer = make_managed<Gtk::Box>();
-    spacer->set_vexpand(true);  
-    m_uibox.append(*spacer);
     m_uibox.append(progress_bar);
     
     m_uibox.set_css_classes({"main-vbox"});
     m_menubox.set_css_classes({"main-vbox"});
     file_open_btn->set_css_classes({"menu-button"});
     file_open_btn->set_has_frame(false);
-    m_button1.set_css_classes({"ui-button"});
     set_child(m_vbox);
     
     set_focusable(true); 
@@ -165,28 +160,12 @@ bool MainWindow::file_load_handler() {
         std::cout << "Origin: " << loader->data->origin.x << ',' << loader->data->origin.y << ',' << loader->data->origin.z << std::endl;
         std::cout << "Spacing: " << loader->data->spacing.x << ',' << loader->data->spacing.y << ',' << loader->data->spacing.z << std::endl;
 #endif           
-        spatial_handler.make_current();
-        spatial_renderer.setup_scene(loader->data);
-        attrib_renderer.set_field_data(loader->data);
-        std::vector<MVF::AxisDesc> desc(1);
-        if (loader->data->scalars.size() >= 3) {
-            std::vector<std::string> keys;
-            for (auto& [key, _]: loader->data->scalars) {
-                keys.push_back(key);
-            }
-            spatial_renderer.entity.set_vector_mode(keys[0], keys[1], keys[2]);
-            desc.push_back(MVF::AxisDesc{});
-        }
-        spatial_handler.queue_render();
-        attrib_renderer.set_attrib_space_dim(desc);
-        attrib_handler.queue_render();
+
+        spatial_panel.load_model(loader->data);
+        attrib_panel.load_model(loader->data);
 
         return false;
     }
 
     return true;
-}
-
-void MainWindow::on_button1_clicked() {
-    m_label.set_text("Vector arrow glyph");
 }

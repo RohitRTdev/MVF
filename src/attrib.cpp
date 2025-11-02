@@ -38,10 +38,11 @@ namespace MVF {
     
     void AttribRenderer::set_field_data(std::shared_ptr<VolumeData>& vol) {
         data = vol;
+        descriptors.clear();
     }
     
     void AttribRenderer::set_attrib_space_dim(const std::vector<AxisDesc>& descriptors) {
-        if (descriptors.size() > 2) {
+        if (!data || descriptors.size() > 2) {
             return;
         }
 

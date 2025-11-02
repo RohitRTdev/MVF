@@ -3,6 +3,8 @@
 #include "renderer.h"
 
 class MainWindow;
+class SpatialPanel;
+class AttributePanel;
 
 namespace MVF {
     class RenderHandler : public Gtk::GLArea {
@@ -10,6 +12,8 @@ namespace MVF {
         RenderHandler(Renderer* renderer, bool is_spatial_handler = true);
    
         friend MainWindow;
+        friend SpatialPanel;
+        friend AttributePanel;
     private:
         Renderer* renderer;
         bool is_spatial_renderer;

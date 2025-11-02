@@ -6,6 +6,7 @@
 #include "vtk.h"
 #include "handler.h"
 #include "renderer.h"
+#include "panel.h"
 
 class OverlayProgressBar : public Gtk::Box {
 public:
@@ -27,7 +28,6 @@ public:
     friend MVF::RenderHandler;
 private:
     void on_file_open();
-    void on_button1_clicked();
     bool file_load_handler();
     bool on_window_close();
     bool on_key_press();
@@ -41,11 +41,11 @@ private:
     Gtk::Box m_hbox{Gtk::Orientation::HORIZONTAL};
     Gtk::Box m_uibox{Gtk::Orientation::VERTICAL};
     
-    Gtk::Label m_label;
-    Gtk::Button m_button1{"Button 1"};
     MVF::RenderHandler spatial_handler, attrib_handler;
     MVF::SpatialRenderer spatial_renderer;
     MVF::AttribRenderer attrib_renderer;
+    SpatialPanel spatial_panel;
+    AttributePanel attrib_panel; 
 
     OverlayProgressBar progress_bar;
 };
