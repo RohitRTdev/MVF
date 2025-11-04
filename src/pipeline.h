@@ -5,9 +5,13 @@
 
 namespace MVF {
     enum class PipelineType {
+        // Spatial domain
         VEC_GLYPH = 0,
         BOX,
-        AXIS = 0
+
+        // Attribute domain
+        AXIS = 0,
+        MARKER
     };
 
     struct Pipeline {
@@ -36,12 +40,18 @@ namespace MVF {
     };
     
     struct BoxPipeline : Pipeline {
-        GLuint uMVP;
+        GLuint uMVP, uColor;
         
         BoxPipeline();    
     };
     
     struct AxisPipeline : Pipeline {
+        GLuint uColor;
         AxisPipeline();    
+    };
+    
+    struct MarkerPipeline: Pipeline {
+        GLuint uColor;
+        MarkerPipeline();    
     };
 }

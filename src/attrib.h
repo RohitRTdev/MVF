@@ -4,15 +4,19 @@
 #include <cstddef>
 #include <string>
 
+constexpr float AXIS_LENGTH = 1.6f;
+
 namespace MVF {
     enum class TraitType {
         POINT,
         RANGE
     };
 
+#pragma pack(push, 1)
     struct Point {
         float x, y;
     };
+#pragma pack(pop)
 
     struct Interval {
         float left, right;
@@ -34,8 +38,13 @@ namespace MVF {
     };
 
     struct AxisDesc {
-        std::string_view comp_name;
+        std::string comp_name;
         std::string display_name;
         float (*derive)(float comp);
+    };
+
+    struct AxisDescMeta {
+        AxisDesc desc;
+        float min_val, max_val;
     };
 }

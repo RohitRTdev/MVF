@@ -6,7 +6,7 @@
 
 using namespace Gtk;
 
-MainWindow::MainWindow() : spatial_handler(&spatial_renderer), attrib_handler(&attrib_renderer, false), 
+MainWindow::MainWindow() : spatial_handler(&spatial_renderer), attrib_handler(&attrib_renderer), 
 spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     extern MVF::ErrorBox main_error_box;
     
@@ -21,6 +21,7 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     auto pane = make_managed<Paned>();
     pane->set_start_child(spatial_handler);
     pane->set_end_child(attrib_handler);
+    pane->set_css_classes({"draw-board"});
     m_hbox.append(*pane);
 
     spatial_panel.set_vexpand(true);
@@ -44,50 +45,12 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     
     set_focusable(true); 
     auto key_controller = Gtk::EventControllerKey::create();
-    key_controller->signal_key_pressed().connect(sigc::mem_fun(spatial_handler, &MVF::RenderHandler::on_key_pressed), false);
+    key_controller->signal_key_pressed().connect(sigc::mem_fun(spatial_handler, &MVF::SpatialHandler::on_key_pressed), false);
     add_controller(key_controller);
 
     signal_close_request().connect(sigc::mem_fun(*this, &MainWindow::on_window_close), false);
 }
     
-OverlayProgressBar::OverlayProgressBar() : Gtk::Box(Gtk::Orientation::VERTICAL, 0) {
-    auto overlay = Gtk::make_managed<Gtk::Overlay>();
-
-    progress_bar.set_show_text(false);
-    progress_bar.set_fraction(0.0);
-    progress_bar.set_css_classes({"thick-bar"});
-    progress_bar.set_sensitive(false);
-    progress_bar.set_opacity(0.0);
-    overlay->set_child(progress_bar);
-
-    label_progress.set_text("0%");
-    label_progress.set_css_classes({"progress-label"});
-    label_progress.set_halign(Gtk::Align::CENTER);
-    label_progress.set_valign(Gtk::Align::CENTER);
-    label_progress.set_opacity(0.0);
-    overlay->add_overlay(label_progress);
-
-    append(*overlay);
-}
-
-void OverlayProgressBar::show() {
-    progress_bar.set_opacity(1.0);
-    label_progress.set_opacity(1.0);
-    progress_bar.set_sensitive(true);
-}
-
-void OverlayProgressBar::hide() {
-    progress_bar.set_opacity(0.0);
-    label_progress.set_opacity(0.0);
-    progress_bar.set_sensitive(false);
-}
-
-void OverlayProgressBar::set_fraction(double frac) {
-    progress_bar.set_fraction(frac);
-    int pct = static_cast<int>(frac * 100);
-    label_progress.set_text(std::to_string(pct) + "%");
-}
-
 bool MainWindow::on_window_close() {
     if (file_loader_conn.connected()) {
         loader->cancel_io();

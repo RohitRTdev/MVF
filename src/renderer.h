@@ -53,14 +53,19 @@ namespace MVF {
         void resync() override;
     
         void set_field_data(std::shared_ptr<VolumeData>& vol);
-        void set_attrib_space_dim(const std::vector<AxisDesc>& descriptors);
+        void set_attrib_space_axis(const std::vector<AxisDesc>& descriptors);
+        std::pair<float, float> get_field_point(float x, float y, size_t id);
+        void set_point_trait(float x);
+        void set_point_trait(float x, float y);
 
     private:
         Axis axis_mesh_x, axis_mesh_y;
-        GLuint vao_x_axis, vao_y_axis, vbo_x_axis, vbo_y_axis;
+        PointMarker marker;
+        GLuint vao_x_axis, vao_y_axis, vao_marker;
+        GLuint vbo_x_axis, vbo_y_axis, vbo_marker, vbo_marker_pos;
         std::shared_ptr<VolumeData> data;
-        std::vector<AxisDesc> descriptors;
-        std::optional<Trait> sel_trait;
+        std::vector<AxisDescMeta> descriptors;
+        std::vector<Trait> traits;
         void setup_buffers(); 
     };
 }

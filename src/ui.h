@@ -7,17 +7,7 @@
 #include "handler.h"
 #include "renderer.h"
 #include "panel.h"
-
-class OverlayProgressBar : public Gtk::Box {
-public:
-    OverlayProgressBar();
-    void show();
-    void hide();
-    void set_fraction(double fraction);
-private:
-    Gtk::ProgressBar progress_bar;
-    Gtk::Label label_progress;
-};
+#include "widgets.h"
 
 class MainWindow : public Gtk::Window
 {
@@ -41,7 +31,8 @@ private:
     Gtk::Box m_hbox{Gtk::Orientation::HORIZONTAL};
     Gtk::Box m_uibox{Gtk::Orientation::VERTICAL};
     
-    MVF::RenderHandler spatial_handler, attrib_handler;
+    MVF::SpatialHandler spatial_handler;
+    MVF::AttribHandler attrib_handler;
     MVF::SpatialRenderer spatial_renderer;
     MVF::AttribRenderer attrib_renderer;
     SpatialPanel spatial_panel;

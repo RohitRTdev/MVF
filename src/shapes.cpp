@@ -209,5 +209,38 @@ namespace MVF {
         push_arrow(ep1, dir_ep1, arrow_len, arrow_width);
         push_arrow(ep2, dir_ep2, arrow_len, arrow_width);
     }
+        
+    Vector2f PointMarker::rotate_line(Vector2f& pt, float angle) {
+        float angle_rad = ToRadian(angle);
+        float rotation_matrix[2][2] = {
+        {std::cos(angle_rad), std::sin(angle_rad)}, 
+        {-std::sin(angle_rad), std::cos(angle_rad)}
+        };
+
+        Vector2f pt_r;
+        pt_r.x = pt.x * rotation_matrix[0][0] + pt.y * rotation_matrix[1][0];
+        pt_r.y = pt.x * rotation_matrix[0][1] + pt.y * rotation_matrix[1][1];
+    
+        return pt_r; 
+    }
+
+    PointMarker::PointMarker(float length, float thickness) {
+        Vector2f p1 = Vector2f(length / 2, thickness / 2);
+        Vector2f p2 = Vector2f(length / 2, -thickness / 2);
+        Vector2f p3 = Vector2f(-length / 2, -thickness / 2);
+        Vector2f p4 = Vector2f(-length / 2, thickness / 2);
+        
+        std::array<Vector2f, 6> points = {p1, p2, p3, p3, p4, p1};
+        // Line 1
+        for (auto& val: points) {
+            vertices.push_back(rotate_line(val, 45));
+        }
+
+        // Line 2 
+        for (auto& val: points) {
+            vertices.push_back(rotate_line(val, -45));
+        }
+    }
+
 }
 

@@ -136,7 +136,7 @@ namespace MVF {
             glBindVertexArray(arrow_buffer.vao_vec_glyph);
             glGenBuffers(1, &vec_buffer.vbo_glyph);
             glBindBuffer(GL_ARRAY_BUFFER, vec_buffer.vbo_glyph);
-            glBufferData(GL_ARRAY_BUFFER, field_mesh.points.size() * sizeof(GlyphInstance), field_mesh.points.data(), GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, field_mesh.points.size() * sizeof(GlyphInstance), field_mesh.points.data(), GL_DYNAMIC_DRAW);
             glEnableVertexAttribArray(2);
             glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(GlyphInstance), 0);
             glVertexAttribDivisor(2, 1);

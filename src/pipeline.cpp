@@ -110,12 +110,18 @@ namespace MVF{
         uViewPos = get_uniform_var("uViewPos");
     }
         
-    BoxPipeline::BoxPipeline() : Pipeline("shaders/box.vs", "shaders/box.fs", PipelineType::BOX) {
+    BoxPipeline::BoxPipeline() : Pipeline("shaders/box.vs", "shaders/solid_color.fs", PipelineType::BOX) {
         uMVP = get_uniform_var("uMVP");
+        uColor = get_uniform_var("uColor");
     }  
         
-    AxisPipeline::AxisPipeline() : Pipeline("shaders/axis.vs", "shaders/axis.fs", PipelineType::AXIS) 
-    {}
+    AxisPipeline::AxisPipeline() : Pipeline("shaders/axis.vs", "shaders/solid_color.fs", PipelineType::AXIS) {
+        uColor = get_uniform_var("uColor");
+    }
+    
+    MarkerPipeline::MarkerPipeline() : Pipeline("shaders/marker.vs", "shaders/solid_color.fs", PipelineType::MARKER) {
+        uColor = get_uniform_var("uColor");
+    }
 
     std::vector<Pipeline*> Pipeline::init_pipelines(bool is_spatial_pipeline) {
         std::vector<Pipeline*> pipelines;
@@ -127,7 +133,7 @@ namespace MVF{
 #endif
         }
         else {
-            pipelines = {new AxisPipeline()};
+            pipelines = {new AxisPipeline(), new MarkerPipeline()};
 #ifdef MVF_DEBUG
         std::cout << "Created attribute pipeline of size: " << pipelines.size() << std::endl;
 #endif

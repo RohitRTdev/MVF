@@ -68,4 +68,14 @@ namespace MVF {
         void push_line_quad(Vector2f& a, Vector2f& b, float thickness);
         void push_arrow(Vector2f& base, Vector2f& dir, float length, float width);
     };
+
+    struct PointMarker {
+        std::vector<Vector2f> vertices;
+
+        PointMarker() = default;
+        PointMarker(float length, float thickness);
+    
+    private:
+        Vector2f rotate_line(Vector2f& pt, float angle);
+    };
 }

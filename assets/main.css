@@ -55,3 +55,20 @@
     font-weight: bold;
 }
 
+.draw-board {
+    border-style: solid;
+    border-width: 2px;
+    border-color: rgb(255, 60, 0);
+}
+
+.draw-board > separator {
+    background-color: black;       
+    border: 1px solid #eaeaea;
+    border-radius: 3px;
+    min-width: 8px;               
+    min-height: 8px;              
+    background-image: url("white-dot.png");
+    background-repeat: repeat-y;
+    background-position: center;
+    background-size: 2px 2px;   
+}

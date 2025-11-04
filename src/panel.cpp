@@ -3,10 +3,7 @@
 
 using namespace Gtk;
 
-MVFPanel::MVFPanel(MVF::RenderHandler* handler) : handler(handler)
-{}
-
-SpatialPanel::SpatialPanel(MVF::RenderHandler* handler) : MVFPanel(handler) {
+SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler) {
     set_label("Spatial panel");
 
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
@@ -24,7 +21,6 @@ SpatialPanel::SpatialPanel(MVF::RenderHandler* handler) : MVFPanel(handler) {
         auto spatial_renderer = static_cast<MVF::SpatialRenderer*>(this->handler->renderer);
         if (text == "Volume" && selected_mode != Selection::VOLUME) {
             this->handler->make_current();
-            //attrib_renderer.set_field_data(loader->data);
             std::vector<MVF::AxisDesc> desc(1);
             std::vector<std::string> keys;
             for (auto& [key, _]: data->scalars) {
@@ -87,7 +83,7 @@ void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
 
 
 
-AttributePanel::AttributePanel(MVF::RenderHandler* handler) : MVFPanel(handler) {
+AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
     set_label("Attribute panel");
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
     auto dim_box = make_managed<Box>();
@@ -95,17 +91,27 @@ AttributePanel::AttributePanel(MVF::RenderHandler* handler) : MVFPanel(handler) 
     dim_menu.append("0");
     dim_menu.set_active(0);
     dim_menu.signal_changed().connect([this]() {
-        auto value = std::stoi(dim_menu.get_active_text());
+        if (!this->data) {
+            return;
+        }
+
+        size_t value = std::stoi(dim_menu.get_active_text());
         
         this->handler->make_current();
-        auto attrib_renderer = static_cast<MVF::AttribRenderer*>(this->handler->renderer);
         
+        // For now, just select the first n fields from the data
         std::vector<MVF::AxisDesc> desc;
-        for (int i = 0; i < value; i++) {
-            desc.push_back(MVF::AxisDesc{});
+        size_t i = 0;
+        for (auto& [name, _]: this->data->scalars) {
+            desc.push_back(MVF::AxisDesc{.comp_name = name, .derive = [](float val) {return val;}});
+            i++;
+
+            if (i >= value) {
+                break;
+            }
         }
         
-        attrib_renderer->set_attrib_space_dim(desc);
+        this->handler->set_field_info(desc);
         this->handler->queue_render();
     });
     dim_box->set_spacing(5);
