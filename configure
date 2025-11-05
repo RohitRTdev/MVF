@@ -5,7 +5,7 @@ set -e
 # Utility functions
 # ---------------------------------------------------------------
 info() { echo "[INFO] $*"; }
-err()  { echo "[ERROR] $*" >&2; exit 1; }
+err()  { echo "[ERROR] $*" >&2; rm -f "$TMPFILE" "$OUTFILE"; exit 1; }
 
 # ---------------------------------------------------------------
 # Detect environment
@@ -44,11 +44,28 @@ EOF
 
 OUTFILE="$(mktemp testoutXXXX.exe)"
 
-if "$CXX" -std=c++23 -o "$OUTFILE" "$TMPFILE" 2>&1; then
+if "$CXX" -std=c++23 -o "$OUTFILE" "$TMPFILE" >"$OUTFILE" 2>&1; then
   info "Compiler supports C++23"
 else
   err "Compiler does not support -std=c++23. Please upgrade your compiler."
 fi
+
+info "Checking for <ranges> support..."
+cat > "$TMPFILE" <<'EOF'
+#include <ranges>
+#include <vector>
+int main() {
+  auto v = std::views::iota(0, 3)
+  | std::ranges::to<std::vector>();
+}
+EOF
+
+if "$CXX" -std=c++23 -o "$OUTFILE" "$TMPFILE" >"$OUTFILE" 2>&1; then
+  info "Compiler supports <ranges> library"
+else
+  err "No support found for <ranges> library. Please upgrade your compiler."
+fi
+
 rm -f "$TMPFILE" "$OUTFILE"
 
 # ---------------------------------------------------------------
@@ -56,8 +73,8 @@ rm -f "$TMPFILE" "$OUTFILE"
 # ---------------------------------------------------------------
 command -v pkg-config >/dev/null 2>&1 || err "pkg-config not found"
 
-info "Checking for gtkmm-4.0 >= 4.0..."
-pkg-config --exists 'gtkmm-4.0 >= 4.0' || err "gtkmm-4.0 >= 4.0 is required"
+info "Checking for gtkmm >= 4.0..."
+pkg-config --exists 'gtkmm-4.0 >= 4.0' || err "gtkmm >= 4.0 is required"
 
 info "Checking for epoxy..."
 pkg-config --exists 'epoxy' || err "libepoxy is required"
@@ -97,7 +114,7 @@ info "Generating Makefile..."
 
 cat > Makefile <<'EOF'
 # Auto-generated Makefile by configure
-CXX := g++
+CXX := @CXX@
 SRC_DIR := src
 BUILD_DIR := build
 BIN := mvf
@@ -154,6 +171,7 @@ clean:
 EOF
 
 # Substitute variables into Makefile
+sed -i "s|@CXX@|$CXX|g" Makefile
 sed -i "s|@CXXFLAGS@|$COMMON_FLAGS|g" Makefile
 sed -i "s|@LDFLAGS@|$LINK_FLAGS|g" Makefile
 sed -i "s|@PLATFORM@|$PLATFORM|g" Makefile

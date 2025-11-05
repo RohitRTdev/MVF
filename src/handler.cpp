@@ -120,7 +120,7 @@ namespace MVF {
     }
 
     bool SpatialHandler::on_key_pressed(guint keyval, guint keycode, Gdk::ModifierType state) {
-        if (state != Gdk::ModifierType::NO_MODIFIER_MASK) {
+        if (static_cast<int>(state) != 0) {
             return false;
         }
 
