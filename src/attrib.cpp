@@ -1,5 +1,7 @@
 #include <exception>
 #include <format>
+#include <algorithm>
+#include <ranges>
 #include "renderer.h"
 
 
@@ -58,6 +60,7 @@ namespace MVF {
     void AttribRenderer::set_field_data(std::shared_ptr<VolumeData>& vol) {
         data = vol;
         descriptors.clear();
+        traits.clear();
     }
     
     void AttribRenderer::set_attrib_space_axis(const std::vector<AxisDesc>& descriptors) {
@@ -66,14 +69,11 @@ namespace MVF {
         }
 
         this->descriptors.clear();
+        traits.clear();
         for (auto& val: descriptors) {
-            auto min_val = INFINITY, max_val = -INFINITY;
-            for (auto& point: std::get<0>(data->scalars[val.comp_name])) {
-                min_val = std::min(point, min_val);
-                max_val = std::max(point, max_val);
-            }
-
-            this->descriptors.push_back(AxisDescMeta {.desc = val, .min_val = min_val, .max_val = max_val});
+            auto& comp = std::get<0>(data->scalars[val.comp_name]); 
+            auto [min_val, max_val] = std::minmax_element(comp.begin(), comp.end());
+            this->descriptors.push_back(AxisDescMeta {.desc = val, .min_val = *min_val, .max_val = *max_val});
         }
     }
 
@@ -135,24 +135,21 @@ namespace MVF {
         
         traits.push_back(Trait {.type = TraitType::POINT, .data = Point{.x = x, .y = y}});
 
-        std::vector<Point> vertices;
-        for (auto& trait: traits) {
-            vertices.push_back(std::get<Point>(trait.data));
-        }
+        auto vertices = traits | std::views::transform([] (auto& trait) {return std::get<Point>(trait.data);})
+        | std::ranges::to<std::vector>();
             
         glBindBuffer(GL_ARRAY_BUFFER, vbo_marker_pos);
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Point), vertices.data(), GL_DYNAMIC_DRAW);
     }
     
-    std::pair<float, float> AttribRenderer::get_field_point(float x, float y, size_t id) {
+    float AttribRenderer::get_field_point(float t, size_t id) {
         if (descriptors.size() <= id) {
             throw std::runtime_error(std::format("get_field_point() called with id {} when descriptors.size() = {}", id, descriptors.size()));
         }
 
         auto& desc = descriptors[id];
-        auto x_f = 0.5 * ((desc.max_val + desc.min_val) + x * (desc.max_val - desc.min_val));
-        auto y_f = 0.5 * ((desc.max_val + desc.min_val) + y * (desc.max_val - desc.min_val));
+        auto u_f = 0.5 * ((desc.max_val + desc.min_val) + t * (desc.max_val - desc.min_val));
     
-        return std::make_pair(x_f, y_f);
+        return u_f; 
     }
 }

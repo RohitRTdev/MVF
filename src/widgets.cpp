@@ -45,6 +45,7 @@ HoverOverlay::HoverOverlay(Gtk::Widget& parent) {
     set_autohide(false); 
     set_parent(parent);
     set_can_target(false);
+    set_can_focus(false);
     set_position(Gtk::PositionType::RIGHT);
     set_child(label);
 }
@@ -54,11 +55,25 @@ void HoverOverlay::show_at(int x, int y, const std::string& text) {
     get_pointing_to(rect);
    
     int dx = x - rect.get_x(), dy = y - rect.get_y();
-    if (dx > 0) {
-        set_position(Gtk::PositionType::LEFT);
+    if (std::abs(dx) > std::abs(dy)) {
+        if (dx > 0) {
+            set_position(Gtk::PositionType::LEFT);
+            set_offset(-20, 0);
+        }
+        else {
+            set_position(Gtk::PositionType::RIGHT);
+            set_offset(20, 0);
+        }
     }
     else {
-        set_position(Gtk::PositionType::RIGHT);
+        if (dy > 0) {
+            set_position(Gtk::PositionType::TOP);
+            set_offset(0, -20);
+        }
+        else {
+            set_position(Gtk::PositionType::BOTTOM);
+            set_offset(0, 20);
+        }
     }
     set_pointing_to(Gdk::Rectangle{x, y, 1, 1});
     label.set_text(text);

@@ -1,5 +1,5 @@
 #include <iostream>
-#include <GL/glew.h>
+#include <epoxy/gl.h>
 
 #include "entity.h"
 #include "math_utils.h"
@@ -51,6 +51,15 @@ namespace MVF {
 #ifdef MVF_DEBUG
         std::cout << "Deleted all model buffers..." << std::endl;
 #endif
+    }
+   
+    void VolumeEntity::set_box_mode() {
+        type.mode = EntityMode::NONE;
+        if (vec_buffer.is_active) {
+            glDeleteBuffers(1, &vec_buffer.vbo_glyph);
+        }
+
+        vec_buffer.is_active = false;
     }
     
     void VolumeEntity::set_vector_mode(const std::string& field1, const std::string& field2, const std::string& field3) { 

@@ -2,7 +2,7 @@ RM := rm -rf
 CXX := g++
 DEBUGFLAGS := -O0 -g -DMVF_DEBUG
 RLSFLAGS := -O3
-CXXFLAGS := -Wall -MMD -MP -std=c++20 $(shell pkg-config --with-path=$(PKG_CONFIG_PATH) --cflags gtkmm-4.0)
+CXXFLAGS := -Wall -MMD -MP -std=c++23 $(shell pkg-config --with-path=$(PKG_CONFIG_PATH) --cflags gtkmm-4.0)
 LIBS := $(shell pkg-config --with-path=$(PKG_CONFIG_PATH) --libs gtkmm-4.0) -lglew32 -lopengl32
 
 SRC_DIR := src

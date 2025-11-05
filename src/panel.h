@@ -32,6 +32,6 @@ public:
 
 private:
     MVF::AttribHandler* handler;
-    Gtk::ComboBoxText dim_menu;
+    Gtk::ComboBoxText dim_menu, trait_sel;
     size_t max_dim = 0;
 };

@@ -1,6 +1,7 @@
 #include <chrono>
 #include <format>
-#include <GL/glew.h>
+#include <epoxy/gl.h>
+#include <ranges>
 #include "error.h"
 #include "handler.h"
 #include "ui.h"
@@ -20,15 +21,20 @@ static std::pair<double, double> convert_to_ndc(double x, double y, size_t width
     return std::make_pair(x_ndc, y_ndc);
 }
 
-
 namespace MVF {
-    bool RenderHandler::initialized_glew = false;
     RenderHandler::RenderHandler(Renderer* renderer) : renderer(renderer) {
         set_hexpand(true);
         set_vexpand(true);
 
         set_required_version(4, 6);
         set_has_depth_buffer(true);
+        
+        int major, minor;
+        get_required_version(major, minor);
+        if (major != 4 && minor != 6) {
+            MVF::app_error("GL version 4.6 core required");
+        }
+        
         signal_realize().connect(sigc::mem_fun(*this, &RenderHandler::on_realize));
         signal_unrealize().connect(sigc::mem_fun(*this, &RenderHandler::on_unrealize));
         signal_render().connect(sigc::mem_fun(*this, &RenderHandler::on_render), true);
@@ -44,16 +50,10 @@ namespace MVF {
 
         try {
             make_current();
-            if (!initialized_glew) {
-                GLenum res = glewInit();
-                if (res != GLEW_OK) {
-                    MVF::app_error(std::string("Error: ") + reinterpret_cast<const char*>(glewGetErrorString(res)));
-                }
-
-                initialized_glew = true;
-            }
-            
+#ifdef MVF_DEBUG
+            std::cout << "GL version: " << glGetString(GL_VERSION) << std::endl;
             std::cout << "Realizing GLArea..." << std::endl;
+#endif
             renderer->init(get_allocated_width(), get_allocated_height()); 
             // This is needed since gtk might realize and unrealize the context multiple times
             // We need to then recreate the buffers
@@ -88,14 +88,22 @@ namespace MVF {
         auto motion = Gtk::EventControllerMotion::create();
         motion->signal_motion().connect([this] (double x, double y) {
             auto [x_ndc, y_ndc] = convert_to_ndc(x, y, get_allocated_width(), get_allocated_height());
+           
+            auto x_bound = AXIS_LENGTH / 2;
+            auto y_bound = field_comps.size() == 1 ? DETECT_THRESHOLD :  AXIS_LENGTH / 2;
             
-            if (num_dimensions == 0 || std::abs(y_ndc) > DETECT_THRESHOLD || std::abs(x_ndc) > AXIS_LENGTH / 2) {
+            if (field_comps.size() == 0 || std::abs(y_ndc) > y_bound || std::abs(x_ndc) > x_bound) {
                 this->mouse_overlay.hide_now();
                 return;
             }
 
-            auto [x_f, _] = static_cast<AttribRenderer*>(this->renderer)->get_field_point(x_ndc, y_ndc, 0);
-            this->mouse_overlay.show_at(static_cast<int>(x), static_cast<int>(y), std::format("U={:.2f}", x_f));
+            auto x_f = static_cast<AttribRenderer*>(this->renderer)->get_field_point(x_ndc, 0);
+            std::string text = std::format("{}={:.2f}", field_comps[0], x_f);
+            if (field_comps.size() == 2) {
+                auto y_f = static_cast<AttribRenderer*>(this->renderer)->get_field_point(x_ndc, 1);
+                text.append(std::format("\n{}={:.2f}", field_comps[1], y_f));
+            }
+            this->mouse_overlay.show_at(static_cast<int>(x), static_cast<int>(y), text);
         });
         add_controller(motion);
     
@@ -105,7 +113,9 @@ namespace MVF {
     }
         
     void AttribHandler::set_field_info(std::vector<AxisDesc>& descriptors) {
-        num_dimensions = descriptors.size();
+        field_comps = descriptors | std::views::transform([](const AxisDesc& d){ return d.comp_name; }) 
+        | std::ranges::to<std::vector>();
+        
         static_cast<AttribRenderer*>(renderer)->set_attrib_space_axis(descriptors);
     }
 
@@ -165,12 +175,13 @@ namespace MVF {
 
         auto [x_ndc, y_ndc] = convert_to_ndc(x, y, width, height);
 
-        if (std::abs(y_ndc) > DETECT_THRESHOLD) {
+        if (field_comps.size() != 1 && field_comps.size() != 2) {
             return;
         }
 
         make_current();
-        static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc);
+        field_comps.size() == 1 ? static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc) : 
+        static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc, y_ndc);
         queue_render();
     }
 }

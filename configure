@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+set -e
+
+# ---------------------------------------------------------------
+# Utility functions
+# ---------------------------------------------------------------
+info() { echo "[INFO] $*"; }
+err()  { echo "[ERROR] $*" >&2; exit 1; }
+
+# ---------------------------------------------------------------
+# Detect environment
+# ---------------------------------------------------------------
+UNAME=$(uname -s)
+case "$UNAME" in
+  *MINGW*|*MSYS*|*CYGWIN*)
+    PLATFORM="windows"
+    ;;
+  *)
+    PLATFORM="linux"
+    ;;
+esac
+
+info "Detected platform: $PLATFORM"
+
+# ---------------------------------------------------------------
+# Compiler detection
+# ---------------------------------------------------------------
+CXX=${CXX:-g++}
+command -v "$CXX" >/dev/null 2>&1 || err "g++ not found in PATH"
+
+info "Detected compiler: $CXX"
+
+# ---------------------------------------------------------------
+# Check for C++23 support
+# ---------------------------------------------------------------
+info "Checking for C++23 support..."
+TMPFILE="$(mktemp testcppXXXX.cpp)"
+cat > "$TMPFILE" <<'EOF'
+#if __cplusplus < 202002L
+#error "C++23 not supported"
+#endif
+int main() { return 0; }
+EOF
+
+OUTFILE="$(mktemp testoutXXXX.exe)"
+
+if "$CXX" -std=c++23 -o "$OUTFILE" "$TMPFILE" 2>&1; then
+  info "Compiler supports C++23"
+else
+  err "Compiler does not support -std=c++23. Please upgrade your compiler."
+fi
+rm -f "$TMPFILE" "$OUTFILE"
+
+# ---------------------------------------------------------------
+# pkg-config and dependencies
+# ---------------------------------------------------------------
+command -v pkg-config >/dev/null 2>&1 || err "pkg-config not found"
+
+info "Checking for gtkmm-4.0 >= 4.0..."
+pkg-config --exists 'gtkmm-4.0 >= 4.0' || err "gtkmm-4.0 >= 4.0 is required"
+
+info "Checking for epoxy..."
+pkg-config --exists 'epoxy' || err "libepoxy is required"
+
+# ---------------------------------------------------------------
+# Check for OpenGL headers
+# ---------------------------------------------------------------
+if [ "$PLATFORM" = "windows" ]; then
+  GL_HEADERS="/mingw64/include/GL/gl.h"
+else
+  GL_HEADERS="/usr/include/GL/gl.h"
+fi
+
+FOUND_GL=0
+for hdr in $GL_HEADERS; do
+  if [ -f "$hdr" ]; then
+    info "Found OpenGL header: $hdr"
+    FOUND_GL=1
+    break
+  fi
+done
+
+[ $FOUND_GL -eq 1 ] || err "OpenGL headers not found!"
+
+# ---------------------------------------------------------------
+# Build flags
+# ---------------------------------------------------------------
+GTK_CFLAGS=$(pkg-config --cflags gtkmm-4.0 epoxy)
+GTK_LIBS=$(pkg-config --libs gtkmm-4.0 epoxy)
+COMMON_FLAGS="-Wall -std=c++23 -MMD -MP $GTK_CFLAGS"
+LINK_FLAGS="$GTK_LIBS"
+
+# ---------------------------------------------------------------
+# Makefile generation
+# ---------------------------------------------------------------
+info "Generating Makefile..."
+
+cat > Makefile <<'EOF'
+# Auto-generated Makefile by configure
+CXX := g++
+SRC_DIR := src
+BUILD_DIR := build
+BIN := mvf
+
+SRCS := $(wildcard $(SRC_DIR)/*.cpp)
+OBJS := $(SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
+DEPS := $(OBJS:.o=.d)
+
+CXXFLAGS := @CXXFLAGS@
+LDFLAGS := @LDFLAGS@
+PLATFORM := @PLATFORM@
+
+ifeq ($(filter debug,$(MAKECMDGOALS)),debug)
+	CXXFLAGS += -O0 -g -DMVF_DEBUG
+else
+	CXXFLAGS += -O3
+	ifeq ($(PLATFORM),windows)
+		LDFLAGS += -mwindows
+	endif
+endif
+
+.PHONY: all clean debug release
+
+all: release
+
+debug: $(BIN)
+
+release: $(BIN)
+
+$(BUILD_DIR):
+	@mkdir -p $(BUILD_DIR)
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
+	@echo "Compiling $<"
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+ifeq ($(PLATFORM),windows)
+ICON_RES := $(BUILD_DIR)/icon_res.o
+$(ICON_RES): assets/icon.rc | $(BUILD_DIR)
+	@echo "Compiling Windows icon resource"
+	@windres assets/icon.rc -O coff -o $(ICON_RES)
+OBJS += $(ICON_RES)
+endif
+
+$(BIN): $(OBJS)
+	@echo "Linking $(BIN)"
+	$(CXX) $(OBJS) -o $(BIN) $(LDFLAGS)
+
+clean:
+	@echo "Cleaning..."
+	@rm -rf $(BUILD_DIR) $(BIN)
+
+-include $(DEPS)
+EOF
+
+# Substitute variables into Makefile
+sed -i "s|@CXXFLAGS@|$COMMON_FLAGS|g" Makefile
+sed -i "s|@LDFLAGS@|$LINK_FLAGS|g" Makefile
+sed -i "s|@PLATFORM@|$PLATFORM|g" Makefile
+
+info "Makefile created successfully!"
+info "Now run 'make' (for release) or 'make debug'."

@@ -1,3 +1,4 @@
+#include <ranges>
 #include "panel.h"
 #include "renderer.h"
 
@@ -11,6 +12,7 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler) {
     auto rep_label = make_managed<Label>("Representation");
     rep_menu.append("None");
     rep_menu.set_active(0);
+    rep_menu.set_sensitive(false);
     rep_menu.signal_changed().connect([this]() {
         if (!data) {
             return;
@@ -34,7 +36,7 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler) {
         }
         else if (text == "None" && selected_mode != Selection::NONE) {
             this->handler->make_current();
-            spatial_renderer->setup_scene(data);
+            spatial_renderer->entity.set_box_mode();
             this->handler->queue_render();
 
             selected_mode = Selection::NONE;
@@ -58,6 +60,7 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler) {
 void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     bool append_option = false;
     rep_menu.set_active(0);
+    selected_mode = Selection::NONE;
     if (!this->data || this->data->scalars.size() < 3) {
         append_option = true;
     }
@@ -73,6 +76,7 @@ void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
             rep_menu.remove_text(1);
         }
     }
+    rep_menu.set_sensitive(true);
     
     auto spatial_renderer = static_cast<MVF::SpatialRenderer*>(handler->renderer);
 
@@ -81,15 +85,20 @@ void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     handler->queue_render();
 }
 
-
-
 AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
     set_label("Attribute panel");
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
     auto dim_box = make_managed<Box>();
     auto dim_label = make_managed<Label>("Dimensions");
+    auto trait_box = make_managed<Box>();
+    auto trait_label = make_managed<Label>("Trait selection");
+    trait_sel.append("Point");
+    trait_sel.append("Range");
     dim_menu.append("0");
     dim_menu.set_active(0);
+    trait_sel.set_active(0);
+    dim_menu.set_sensitive(false);
+    trait_sel.set_sensitive(false);
     dim_menu.signal_changed().connect([this]() {
         if (!this->data) {
             return;
@@ -99,30 +108,33 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
         
         this->handler->make_current();
         
-        // For now, just select the first n fields from the data
-        std::vector<MVF::AxisDesc> desc;
-        size_t i = 0;
-        for (auto& [name, _]: this->data->scalars) {
-            desc.push_back(MVF::AxisDesc{.comp_name = name, .derive = [](float val) {return val;}});
-            i++;
+        auto desc = this->data->scalars | std::views::take(value) | std::views::transform([](auto& pair) {
+            auto& [name, _] = pair;
+            return MVF::AxisDesc{
+                .comp_name = name,
+                .derive = [](float val) { return val; }
+            };
+        }) | std::ranges::to<std::vector>();            
 
-            if (i >= value) {
-                break;
-            }
-        }
-        
+        trait_sel.set_sensitive(value > 0);
+
         this->handler->set_field_info(desc);
         this->handler->queue_render();
     });
     dim_box->set_spacing(5);
     dim_box->set_margin(5);
+    trait_box->set_spacing(5);
+    trait_box->set_margin(5);
     dim_box->append(*dim_label);
     dim_box->append(dim_menu);
+    trait_box->append(*trait_label);
+    trait_box->append(trait_sel);
     
     auto spacer = make_managed<Box>(Orientation::VERTICAL);
     spacer->set_vexpand(true);
     
     vbox->append(*dim_box);
+    vbox->append(*trait_box);
     vbox->append(*spacer);
 
     set_child(*vbox);
@@ -141,6 +153,8 @@ void AttributePanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
         dim_menu.append(std::to_string(i));
     }
 
+    dim_menu.set_sensitive(true);
+    trait_sel.set_sensitive(false);
     handler->make_current();
     static_cast<MVF::AttribRenderer*>(handler->renderer)->set_field_data(this->data);
     handler->queue_render();

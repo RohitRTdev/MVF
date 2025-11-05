@@ -1,4 +1,6 @@
 #include <cstring>
+#include <algorithm>
+#include <ranges>
 #include "shapes.h"
 
 constexpr uint8_t SEGMENTS = 20;
@@ -231,14 +233,11 @@ namespace MVF {
         Vector2f p4 = Vector2f(-length / 2, thickness / 2);
         
         std::array<Vector2f, 6> points = {p1, p2, p3, p3, p4, p1};
-        // Line 1
-        for (auto& val: points) {
-            vertices.push_back(rotate_line(val, 45));
-        }
-
-        // Line 2 
-        for (auto& val: points) {
-            vertices.push_back(rotate_line(val, -45));
+        for (auto angle : {45, -45}) {
+            std::ranges::copy(
+                points | std::views::transform([this, angle](auto& val){ return rotate_line(val, angle); }),
+                std::back_inserter(vertices)
+            );
         }
     }
 

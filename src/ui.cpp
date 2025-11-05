@@ -6,7 +6,8 @@
 
 using namespace Gtk;
 
-MainWindow::MainWindow() : spatial_handler(&spatial_renderer), attrib_handler(&attrib_renderer), 
+MainWindow::MainWindow() : toggle_on_icon(Image("assets/toggle-on.png")), toggle_off_icon(Image("assets/toggle-off.png")), 
+spatial_handler(&spatial_renderer), attrib_handler(&attrib_renderer), 
 spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     extern MVF::ErrorBox main_error_box;
     
@@ -19,8 +20,35 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     m_hbox.append(m_uibox);
 
     auto pane = make_managed<Paned>();
-    pane->set_start_child(spatial_handler);
-    pane->set_end_child(attrib_handler);
+    auto spatial_hbox = make_managed<Box>();
+    spatial_hbox->set_spacing(5);
+    spatial_hbox->set_css_classes({".main-vbox"});
+    spatial_hbox->set_hexpand(true);
+    auto attrib_hbox = make_managed<Box>();
+    attrib_hbox->set_spacing(5);
+    attrib_hbox->set_css_classes({".main-vbox"});
+    attrib_hbox->set_hexpand(true);
+    auto spatial_vbox = make_managed<Box>(Gtk::Orientation::VERTICAL);
+    auto attrib_vbox = make_managed<Box>(Gtk::Orientation::VERTICAL);
+    auto toggle_button = make_managed<Button>();
+    auto reset_icon = Image("assets/reset.png");
+    toggle_button->set_child(toggle_off_icon);
+    toggle_button->signal_clicked().connect([this, toggle_button] {
+        is_toggle_on ? toggle_button->set_child(toggle_off_icon) : toggle_button->set_child(toggle_on_icon);
+        is_toggle_on = !is_toggle_on;
+    });
+    auto reset_button = make_managed<Button>();
+    reset_button->set_child(reset_icon);
+    reset_button->set_css_classes({"menu-button"});
+    toggle_button->set_css_classes({"menu-button"});
+    spatial_hbox->append(*reset_button);
+    spatial_hbox->append(*toggle_button);
+    spatial_vbox->append(*spatial_hbox);
+    spatial_vbox->append(spatial_handler);
+    attrib_vbox->append(*attrib_hbox);
+    attrib_vbox->append(attrib_handler);
+    pane->set_start_child(*spatial_vbox);
+    pane->set_end_child(*attrib_vbox);
     pane->set_css_classes({"draw-board"});
     m_hbox.append(*pane);
 
@@ -32,6 +60,7 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     auto file_open_btn = make_managed<Button>();
     auto file_open_icon = make_managed<Image>("assets/file-open.png"); 
     file_open_btn->set_child(*file_open_icon);
+    file_open_btn->set_tooltip_text("Open vtk file");
     file_open_btn->signal_clicked().connect(sigc::mem_fun(*this, &MainWindow::on_file_open));
     m_menubox.append(*file_open_btn);
 

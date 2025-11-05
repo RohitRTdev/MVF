@@ -66,6 +66,7 @@ namespace MVF {
         void load_model(std::shared_ptr<VolumeData>& data);
         void destroy_buffers(bool destroy_static_buffers = true);
         void switch_field();
+        void set_box_mode();
         void set_vector_mode(const std::string& field1, const std::string& field2, const std::string& field3);
         void scale(float factor);
         void resync();

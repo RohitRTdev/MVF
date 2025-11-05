@@ -43,7 +43,7 @@ namespace MVF {
 
     private:
         HoverOverlay mouse_overlay;
-        size_t num_dimensions = 0;
+        std::vector<std::string> field_comps;
         void on_mouse_click(int n_press, double x, double y);
     };
 }

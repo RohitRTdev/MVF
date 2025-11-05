@@ -1,6 +1,6 @@
 #pragma once
 
-#include <GL/glew.h>
+#include <epoxy/gl.h>
 #include <vector>
 
 #include "entity.h"
@@ -54,7 +54,7 @@ namespace MVF {
     
         void set_field_data(std::shared_ptr<VolumeData>& vol);
         void set_attrib_space_axis(const std::vector<AxisDesc>& descriptors);
-        std::pair<float, float> get_field_point(float x, float y, size_t id);
+        float get_field_point(float t, size_t id);
         void set_point_trait(float x);
         void set_point_trait(float x, float y);
 
