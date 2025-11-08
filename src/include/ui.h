@@ -32,7 +32,8 @@ private:
     Gtk::Box m_menubox{Gtk::Orientation::HORIZONTAL};
     Gtk::Box m_hbox{Gtk::Orientation::HORIZONTAL};
     Gtk::Box m_uibox{Gtk::Orientation::VERTICAL};
-    Gtk::Image toggle_on_icon, toggle_off_icon;
+    
+    Gtk::Box spatial_box{Gtk::Orientation::VERTICAL}, attrib_box{Gtk::Orientation::VERTICAL}, dist_box{Gtk::Orientation::VERTICAL};
     
     MVF::SpatialHandler spatial_handler;
     MVF::AttribHandler attrib_handler;

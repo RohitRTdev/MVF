@@ -33,7 +33,7 @@ namespace MVF {
         
         void init(int width, int height) override;
         void setup_scene(std::shared_ptr<VolumeData>& data);
-        void purge_scene(); 
+        void purge_scene();
 
         void render() override;
         void resync() override;

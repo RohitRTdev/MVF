@@ -27,6 +27,7 @@ namespace MVF {
     class SpatialHandler : public RenderHandler {
     public:
         SpatialHandler(SpatialRenderer* renderer);
+        void reset_camera();
         friend MainWindow;
         friend SpatialPanel;
 

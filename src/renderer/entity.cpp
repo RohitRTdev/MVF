@@ -232,6 +232,11 @@ namespace MVF {
     void VolumeEntity::scale(float factor) {
         scale_transform.init_scale_transform(factor, factor, factor);
     }
+        
+    void VolumeEntity::reset_transform() {
+        scale_transform.init_identity();
+        world.init_identity();
+    }
 
     Vector3f Entity::get_position() {
         return world * position;

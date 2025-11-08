@@ -1,15 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-# ---------------------------------------------------------------
 # Utility functions
-# ---------------------------------------------------------------
 info() { echo "[INFO] $*"; }
 err()  { echo "[ERROR] $*" >&2; rm -f "$TMPFILE" "$OUTFILE"; exit 1; }
 
-# ---------------------------------------------------------------
 # Detect environment
-# ---------------------------------------------------------------
 UNAME=$(uname -s)
 case "$UNAME" in
   *MINGW*|*MSYS*|*CYGWIN*)
@@ -22,17 +18,13 @@ esac
 
 info "Detected platform: $PLATFORM"
 
-# ---------------------------------------------------------------
 # Compiler detection
-# ---------------------------------------------------------------
 CXX=${CXX:-g++}
 command -v "$CXX" >/dev/null 2>&1 || err "g++ not found in PATH"
 
 info "Detected compiler: $CXX"
 
-# ---------------------------------------------------------------
 # Check for C++23 support
-# ---------------------------------------------------------------
 info "Checking for C++23 support..."
 TMPFILE="$(mktemp testcppXXXX.cpp)"
 cat > "$TMPFILE" <<'EOF'
@@ -68,20 +60,19 @@ fi
 
 rm -f "$TMPFILE" "$OUTFILE"
 
-# ---------------------------------------------------------------
 # pkg-config and dependencies
-# ---------------------------------------------------------------
 command -v pkg-config >/dev/null 2>&1 || err "pkg-config not found"
 
 info "Checking for gtkmm >= 4.0..."
 pkg-config --exists 'gtkmm-4.0 >= 4.0' || err "gtkmm >= 4.0 is required"
+info "Found gtkmm-4.0"
 
 info "Checking for epoxy..."
 pkg-config --exists 'epoxy' || err "libepoxy is required"
+info "Found libepoxy"
 
-# ---------------------------------------------------------------
 # Check for OpenGL headers
-# ---------------------------------------------------------------
+# For now, we just check these locations. Feel free to add more...
 if [ "$PLATFORM" = "windows" ]; then
   GL_HEADERS="/mingw64/include/GL/gl.h"
 else
@@ -99,19 +90,13 @@ done
 
 [ $FOUND_GL -eq 1 ] || err "OpenGL headers not found!"
 
-# ---------------------------------------------------------------
 # Build flags
-# ---------------------------------------------------------------
 GTK_CFLAGS=$(pkg-config --cflags gtkmm-4.0 epoxy)
 GTK_LIBS=$(pkg-config --libs gtkmm-4.0 epoxy)
-COMMON_FLAGS="-Wall -std=c++23 -MMD -MP $GTK_CFLAGS"
+COMMON_FLAGS="-Wall -std=c++23 -MMD -MP -Isrc/include $GTK_CFLAGS"
 LINK_FLAGS="$GTK_LIBS"
 
-# ---------------------------------------------------------------
 # Makefile generation
-# ---------------------------------------------------------------
-info "Generating Makefile..."
-
 cat > Makefile <<'EOF'
 # Auto-generated Makefile by configure
 CXX := @CXX@
@@ -119,8 +104,8 @@ SRC_DIR := src
 BUILD_DIR := build
 BIN := mvf
 
-SRCS := $(wildcard $(SRC_DIR)/*.cpp)
-OBJS := $(SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
+SRCS := $(shell find $(SRC_DIR) -type f -name '*.cpp')
+OBJS := $(addprefix $(BUILD_DIR)/,$(subst /,_,$(SRCS:$(SRC_DIR)/%.cpp=%.o)))
 DEPS := $(OBJS:.o=.d)
 
 CXXFLAGS := @CXXFLAGS@
@@ -147,9 +132,17 @@ release: $(BIN)
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
-	@echo "Compiling $<"
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(foreach src,$(SRCS),\
+  $(eval \
+    obj := $(BUILD_DIR)/$(subst /,_,$(patsubst $(SRC_DIR)/%.cpp,%.o,$(src))) \
+  )\
+  $(eval \
+    $(obj): $(src) | $(BUILD_DIR); \
+        @echo "Compiling $(src)"; \
+        echo $(CXX) $(CXXFLAGS) -c $(src) -o $(obj);\
+        $(CXX) $(CXXFLAGS) -c $(src) -o $(obj) \
+  )\
+)
 
 ifeq ($(PLATFORM),windows)
 ICON_RES := $(BUILD_DIR)/icon_res.o

@@ -69,6 +69,7 @@ namespace MVF {
         void set_box_mode();
         void set_vector_mode(const std::string& field1, const std::string& field2, const std::string& field3);
         void scale(float factor);
+        void reset_transform(); 
         void resync();
         friend SpatialRenderer;
     

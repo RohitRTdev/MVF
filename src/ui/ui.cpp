@@ -6,8 +6,7 @@
 
 using namespace Gtk;
 
-MainWindow::MainWindow() : toggle_on_icon(Image("assets/toggle-on.png")), toggle_off_icon(Image("assets/toggle-off.png")), 
-spatial_handler(&spatial_renderer), attrib_handler(&attrib_renderer), 
+MainWindow::MainWindow() : spatial_handler(&spatial_renderer), attrib_handler(&attrib_renderer), 
 spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     extern MVF::ErrorBox main_error_box;
     
@@ -22,34 +21,53 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     auto pane = make_managed<Paned>();
     auto spatial_hbox = make_managed<Box>();
     spatial_hbox->set_spacing(5);
-    spatial_hbox->set_css_classes({".main-vbox"});
+    spatial_hbox->set_css_classes({"main-vbox"});
     spatial_hbox->set_hexpand(true);
     auto attrib_hbox = make_managed<Box>();
     attrib_hbox->set_spacing(5);
-    attrib_hbox->set_css_classes({".main-vbox"});
+    attrib_hbox->set_css_classes({"main-vbox"});
     attrib_hbox->set_hexpand(true);
-    auto spatial_vbox = make_managed<Box>(Gtk::Orientation::VERTICAL);
-    auto attrib_vbox = make_managed<Box>(Gtk::Orientation::VERTICAL);
-    auto toggle_button = make_managed<Button>();
-    auto reset_icon = Image("assets/reset.png");
-    toggle_button->set_child(toggle_off_icon);
-    toggle_button->signal_clicked().connect([this, toggle_button] {
-        is_toggle_on ? toggle_button->set_child(toggle_off_icon) : toggle_button->set_child(toggle_on_icon);
-        is_toggle_on = !is_toggle_on;
-    });
+    auto dist_fld_button = make_managed<Button>();
     auto reset_button = make_managed<Button>();
+    auto dist_fld_icon = Image("assets/toggle-on.png");
+    auto reset_icon = Image("assets/reset.png");
+    auto reset_attrib_button = make_managed<Button>();
+    auto reset_attrib_icon = Image("assets/reset.png");
+    dist_fld_button->set_child(dist_fld_icon);
     reset_button->set_child(reset_icon);
-    reset_button->set_css_classes({"menu-button"});
-    toggle_button->set_css_classes({"menu-button"});
+    reset_attrib_button->set_child(reset_attrib_icon);
+    reset_button->set_has_frame(false);
+    reset_button->set_tooltip_text("Reset camera");
+    dist_fld_button->set_has_frame(false);
+    dist_fld_button->set_tooltip_text("Switch to distance field");
+    reset_attrib_button->set_has_frame(false);
+    reset_attrib_button->set_tooltip_text("Clear traits");
+    
+    reset_button->signal_clicked().connect([this] {
+        spatial_handler.reset_camera();
+    });
+   
     spatial_hbox->append(*reset_button);
-    spatial_hbox->append(*toggle_button);
-    spatial_vbox->append(*spatial_hbox);
-    spatial_vbox->append(spatial_handler);
-    attrib_vbox->append(*attrib_hbox);
-    attrib_vbox->append(attrib_handler);
-    pane->set_start_child(*spatial_vbox);
-    pane->set_end_child(*attrib_vbox);
+    spatial_hbox->append(*dist_fld_button);
+    spatial_box.append(*spatial_hbox);
+    spatial_box.append(spatial_handler);
+    attrib_hbox->append(*reset_attrib_button);
+    attrib_box.append(*attrib_hbox);
+    attrib_box.append(attrib_handler);
+    spatial_box.set_hexpand(true);
+    attrib_box.set_hexpand(true);
+    pane->set_start_child(spatial_box);
+    pane->set_end_child(attrib_box);
     pane->set_css_classes({"draw-board"});
+   
+    pane->signal_realize().connect([pane]() {
+        // Wait for one main loop iteration so allocation is ready
+        Glib::signal_idle().connect_once([pane]() {
+            int width = pane->get_allocated_width();
+            if (width > 0)
+                pane->set_position(width / 2);
+        });
+    });
     m_hbox.append(*pane);
 
     spatial_panel.set_vexpand(true);

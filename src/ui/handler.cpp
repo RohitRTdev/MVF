@@ -168,6 +168,12 @@ namespace MVF {
         queue_render();
         return true;
     } 
+        
+    void SpatialHandler::reset_camera() {
+        current_zoom = 1.0f;
+        static_cast<SpatialRenderer*>(renderer)->entity.reset_transform();
+        queue_render();
+    }
 
     void AttribHandler::on_mouse_click(int n_press, double x, double y) {
         auto width = get_allocated_width();
