@@ -109,7 +109,9 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
         }
 
         size_t value = std::stoi(dim_menu.get_active_text());
-        
+        if (value != prev_value) {
+            handle_changed_value = true;
+        }
         this->handler->make_current();
         
         auto desc = this->data->scalars | std::views::take(value) | std::views::transform([](auto& pair) {
@@ -194,6 +196,36 @@ void AttributePanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     static_cast<MVF::AttribRenderer*>(handler->renderer)->set_field_data(this->data);
     handler->queue_render();
 }
+    
+void FieldPanel::set_traits(const std::vector<MVF::AxisDesc>& attrib_comps, const std::vector<MVF::Trait>& traits) {
+    rep_menu.set_sensitive(true);
+    iso_slider.set_sensitive(true);
+
+    handler->make_current();
+    auto field_handler = static_cast<MVF::FieldRenderer*>(handler->renderer); 
+    field_handler->entity.set_traits(attrib_comps, traits);
+    handler->queue_render();
+}
+
+void FieldPanel::clear_traits() {
+    rep_menu.set_sensitive(false);
+    iso_slider.set_sensitive(false);
+
+    handler->make_current();
+    auto field_handler = static_cast<MVF::FieldRenderer*>(handler->renderer); 
+    field_handler->entity.clear_traits();
+    handler->queue_render();
+}
+    
+void FieldPanel::enable_panel() {
+    rep_menu.set_sensitive(true);
+    iso_slider.set_sensitive(true);
+}
+
+void FieldPanel::disable_panel() {
+    rep_menu.set_sensitive(false);
+    iso_slider.set_sensitive(false);
+}
 
 FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler) {
     set_label("Feature panel");
@@ -201,7 +233,7 @@ FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler) {
     rep_menu.append("Isosurface");
     rep_menu.append("DVR");
     rep_menu.set_active(0);
-    //rep_menu.set_sensitive(false);
+    rep_menu.set_sensitive(false);
 
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
     auto rep_box = make_managed<Box>();
@@ -219,10 +251,11 @@ FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler) {
     iso_slider.set_digits(2);
     //iso_slider.set_margin(10);
     iso_slider.set_draw_value(true); 
-    //iso_slider.set_sensitive(false);
+    iso_slider.set_sensitive(false);
 
     iso_slider.signal_value_changed().connect([this]() {
-        std::cout << "Slider value: " << iso_slider.get_value() << std::endl;
+        static_cast<MVF::FieldRenderer*>(this->handler->renderer)->entity.set_isovalue(iso_slider.get_value());
+        this->handler->queue_render();
     });
 
     auto spacer = make_managed<Box>(Orientation::VERTICAL);
@@ -239,5 +272,6 @@ void FieldPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
 
     handler->make_current();
     field_renderer->setup_scene(data);
+    field_renderer->entity.clear_traits();
     handler->queue_render();
 }

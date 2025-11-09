@@ -60,8 +60,10 @@ namespace MVF {
         void set_field_data(std::shared_ptr<VolumeData>& vol);
         void set_attrib_space_axis(const std::vector<AxisDesc>& descriptors);
         float get_field_point(float t, size_t id);
+        std::pair<std::vector<AxisDesc>, std::vector<Trait>> get_traits();
         void set_point_trait(float x);
         void set_point_trait(float x, float y);
+        void clear_traits();
 
     private:
         Axis axis_mesh_x, axis_mesh_y;

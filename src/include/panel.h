@@ -3,6 +3,7 @@
 #include <gtkmm.h>
 #include "handler.h"
 #include "vtk.h"
+#include "attrib.h"
 
 class MainWindow;
 
@@ -35,7 +36,7 @@ public:
     void enable_panel();
     void set_button_active();
     void set_button_inactive();
-    
+
     friend MainWindow;
 private:
     
@@ -50,6 +51,9 @@ private:
     Gtk::CheckButton show_attrib;
     Gtk::Button apply_button;
     size_t max_dim = 0;
+    size_t prev_value = 0;
+    bool handle_changed_value = false;
+
     PanelState state = {false, false, false};
 
     void change_state(const PanelState& state);
@@ -59,7 +63,10 @@ class FieldPanel : public MVFPanel {
 public: 
     FieldPanel(MVF::SpatialHandler* handler);
     void load_model(std::shared_ptr<MVF::VolumeData>& data);
-
+    void clear_traits();
+    void set_traits(const std::vector<MVF::AxisDesc>& attrib_comps, const std::vector<MVF::Trait>& traits);
+    void enable_panel();
+    void disable_panel();
 private:
 
     MVF::SpatialHandler* handler;

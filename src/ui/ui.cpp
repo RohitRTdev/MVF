@@ -53,6 +53,11 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
                     attrib_panel.set_button_active();
                     trait_handler_pending = false;
                 }
+
+                if (clear_handler_pending) {
+                    field_panel.clear_traits();
+                    clear_handler_pending = false;
+                }
             }
         }
     });
@@ -61,7 +66,16 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
         {
             .tooltip_text = "Clear traits",
             .icon_filename = "assets/reset.png",
-            .handler = []{}
+            .handler = [this] {
+                attrib_renderer.clear_traits();
+                attrib_handler.queue_render();
+                if (is_feature_space_visible) {
+                    clear_handler_pending = true;
+                }
+                else {
+                    field_panel.clear_traits();
+                }
+            }
         }
     });
 
@@ -157,9 +171,28 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
     });
 
     attrib_panel.apply_button.signal_clicked().connect([this] {
-        std::cout << "Apply button clicked..." << std::endl;
         attrib_panel.set_button_inactive();
         trait_handler_pending = false;
+
+        auto [comp, traits] = attrib_renderer.get_traits();
+        field_panel.set_traits(comp, traits);
+    });
+
+    attrib_panel.dim_menu.signal_changed().connect([this] {
+        if (!attrib_panel.handle_changed_value) {
+            return;
+        }
+        
+        attrib_panel.set_button_inactive();
+        trait_handler_pending = false;
+
+        if (is_feature_space_visible) {
+            clear_handler_pending = true;
+        }
+        else {
+            field_panel.clear_traits();
+        }
+        attrib_panel.handle_changed_value = false;
     });
 
     add_controller(mouse_click);
@@ -285,7 +318,10 @@ bool MainWindow::file_load_handler() {
             field_panel.load_model(loader->data);
             is_spatial_model_init = false;
         }
+
         attrib_panel.load_model(loader->data);
+        trait_handler_pending = false;
+        clear_handler_pending = false;
 
         return false;
     }

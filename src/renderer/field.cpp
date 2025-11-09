@@ -5,12 +5,16 @@
 #include "attrib.h"
 
 namespace MVF {
-    FieldEntity::FieldEntity() : VolumeEntity() {
+    FieldEntity::FieldEntity() : Entity::Entity(Vector3f(0, 0, 0)) {
         create_voxel_grid();
     }
 
-    void FieldEntity::init() {
+    void FieldEntity::init(VolumeEntity* geometry_entity) {
+        this->geometry_entity = geometry_entity; 
         create_buffers();
+        if (traits.size()) {
+            build_texture();
+        }
     }
 
     void FieldEntity::create_buffers() {
@@ -53,26 +57,22 @@ namespace MVF {
         steps = Vector3f(x_step, y_step, z_step);
 
         size_t grid_size = res_x * res_y * res_z; 
-        points.reserve(grid_size);
+        points.resize(grid_size);
         for (size_t i = 0; i < res_z; i++) {
             for (size_t j = 0; j < res_y; j++) {
                 for (size_t k = 0; k < res_x; k++) {
                     auto x = k * x_step;
                     auto y = j * y_step;
                     auto z = i * z_step;
-                    points[i * res_y * res_x + j * res_z + k] = Vertex {.x = x, .y = y, .z = z};
+                    points[i * res_y * res_x + j * res_x + k] = Vertex {.x = x, .y = y, .z = z};
                 }
             }
         }    
     }
 
-    void FieldEntity::set_traits(const std::vector<AxisDesc>& attrib_comps, const std::vector<Trait>& traits) {
-        if (attrib_comps.size() != 1 && attrib_comps.size() != 2) {
-            std::runtime_error("Only 1 and 2 dimensional traits supported for now...");
-        }
-        
-        auto grid_size = model->nx * model->ny * model->nz;
-        field.reserve(grid_size);
+    void FieldEntity::build_distance_field() {
+        auto grid_size = geometry_entity->model->nx * geometry_entity->model->ny * geometry_entity->model->nz;
+        field.resize(grid_size);
         
         float max_dist = 0;
         for (int i = 0; i < grid_size; i++) {
@@ -81,7 +81,7 @@ namespace MVF {
             // Get the point in attribute space for this point in domain
             std::vector<float> pt(attrib_comps.size());
             for (size_t dim = 0; dim < attrib_comps.size(); dim++) {
-                auto& fld = std::get<0>(model->scalars[attrib_comps[dim].comp_name]);
+                auto& fld = std::get<0>(geometry_entity->model->scalars[attrib_comps[dim].comp_name]);
                 pt[dim] = fld[i];
             }
 
@@ -106,7 +106,7 @@ namespace MVF {
                         break;
                     }
                     default: {
-                        std::runtime_error("Only point trait supported right now....");
+                        throw std::runtime_error("Only point trait supported right now....");
                     }
                 }
             }
@@ -119,11 +119,33 @@ namespace MVF {
         // Normalize the field
         field = field | std::views::transform([max_dist] (float val) { return val / max_dist;}) | std::ranges::to<std::vector<float>>();
 
-        glBindTexture(GL_TEXTURE_3D, tex3d);
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, model->nx, model->ny, model->nz,
-            0, GL_RED, GL_FLOAT, field.data()
-        );
         set_draw_mode = true;
+    }
+
+    void FieldEntity::build_texture() {
+        glBindTexture(GL_TEXTURE_3D, tex3d);
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, geometry_entity->model->nx, geometry_entity->model->ny,
+            geometry_entity->model->nz, 0, GL_RED, GL_FLOAT, field.data()
+        );
+    }
+
+    void FieldEntity::set_traits(const std::vector<AxisDesc>& attrib_comps, const std::vector<Trait>& traits) {
+        if (attrib_comps.size() != 1 && attrib_comps.size() != 2) {
+            throw std::runtime_error("Only 1 and 2 dimensional traits supported for now...");
+        }
+
+        this->attrib_comps = attrib_comps;
+        this->traits = traits;
+        build_distance_field();
+        build_texture();
+    }
+        
+    void FieldEntity::set_isovalue(float value) {
+        iso_value = value;
+    }
+        
+    void FieldEntity::clear_traits() {
+        set_draw_mode = false;
     }
 
     void FieldEntity::draw() {
@@ -141,7 +163,7 @@ namespace MVF {
 
     void FieldRenderer::init(int width, int height) {
         SpatialRenderer::init(width, height);
-        entity.init();
+        entity.init(&this->SpatialRenderer::entity);
     }
 
     void FieldRenderer::render() {
@@ -151,12 +173,13 @@ namespace MVF {
         // Our entity is responsible for displaying computed distance field
         auto limits = Vector3f(SpatialRenderer::entity.model->nx, SpatialRenderer::entity.model->ny, SpatialRenderer::entity.model->nz);
 		Matrix4f mvp = projection * camera.view * SpatialRenderer::entity.world * SpatialRenderer::entity.scale_transform * SpatialRenderer::entity.init_transform;
+		Matrix4f mp = SpatialRenderer::entity.world * SpatialRenderer::entity.scale_transform * SpatialRenderer::entity.init_transform;
 		auto light_position = light.get_position();
 		auto camera_position = camera.get_position();
   
         auto pipeline = static_cast<IsoPipeline*>(pipelines[static_cast<int>(PipelineType::ISO)]);
         glUseProgram(pipeline->shader_program); 
-		glUniformMatrix4fv(pipeline->uM, 1, GL_TRUE, &SpatialRenderer::entity.world.m[0][0]);
+		glUniformMatrix4fv(pipeline->uM, 1, GL_TRUE, &mp.m[0][0]);
 		glUniformMatrix4fv(pipeline->uMVP, 1, GL_TRUE, &mvp.m[0][0]);
 		glUniform3fv(pipeline->uLightPos, 1, light_position);
 		glUniform3fv(pipeline->uViewPos, 1, camera_position);

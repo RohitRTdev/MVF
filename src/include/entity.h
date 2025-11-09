@@ -1,11 +1,13 @@
 #pragma once
 
 #include <variant>
+#include <atomic>
 #include "vtk.h"
 #include "math_utils.h"
 #include "shapes.h"
 #include "pipeline.h"
 #include "attrib.h"
+#include "widgets.h"
 
 enum class EntityMode {
     NONE,
@@ -28,6 +30,13 @@ struct EntityRepresentation {
 namespace MVF {
     class SpatialRenderer;
     class FieldRenderer;
+    class FieldEntity;
+
+    struct ProgressProxy {
+        std::atomic<size_t> points_written;
+        size_t total_points;
+    };
+
 
     class Entity {
     public:
@@ -74,15 +83,13 @@ namespace MVF {
         void resync();
         friend SpatialRenderer;
         friend FieldRenderer;
-
-    protected:
+        friend FieldEntity;
+    
+    private:
         std::shared_ptr<VolumeData> model;
         Matrix4f init_transform;
         Matrix4f scale_transform;
         
-        void draw() override;
-    
-    private:
         EntityRepresentation type;    
         BoundingBox box; 
         ArrowMesh arrow_mesh;
@@ -103,14 +110,17 @@ namespace MVF {
         void create_vertex_array();
         void create_bounding_box_buffers(); 
         void create_buffers();
+        void draw() override;
     };
 
-    class FieldEntity : public VolumeEntity {
+    class FieldEntity : Entity {
     public:
-        
+
         FieldEntity();
-        void init();
+        void init(VolumeEntity* geometry_entity);
         void set_traits(const std::vector<AxisDesc>& attrib_comps, const std::vector<Trait>& traits);
+        void clear_traits();
+        void set_isovalue(float value);
         friend FieldRenderer;
     
     private:
@@ -119,13 +129,18 @@ namespace MVF {
         GLuint tex3d;
         Vector3f steps;
         const size_t res_x = 100, res_y = 100, res_z = 100;
-        size_t iso_value = 0;
+        float iso_value = 0;
         std::vector<Vertex> points;
         std::vector<float> field;
+        std::vector<AxisDesc> attrib_comps;
+        std::vector<Trait> traits;
+        VolumeEntity* geometry_entity;
         bool set_draw_mode = false;
 
         void create_voxel_grid();
         void create_buffers();
+        void build_distance_field();
+        void build_texture();
         
         void draw() override;
     };

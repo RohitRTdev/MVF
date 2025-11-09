@@ -91,6 +91,18 @@ namespace MVF {
             this->descriptors.push_back(AxisDescMeta {.desc = val, .min_val = *min_val, .max_val = *max_val});
         }
     }
+        
+    std::pair<std::vector<AxisDesc>, std::vector<Trait>> AttribRenderer::get_traits() {
+        auto desc = this->descriptors | std::views::transform([] (const AxisDescMeta& val) {
+            return val.desc;
+        }) | std::ranges::to<std::vector<AxisDesc>>();
+
+        return std::make_pair(desc, traits);
+    }
+        
+    void AttribRenderer::clear_traits() {
+        traits.clear();
+    }
 
     void AttribRenderer::render() {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

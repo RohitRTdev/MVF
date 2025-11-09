@@ -123,7 +123,7 @@ namespace MVF{
         uColor = get_uniform_var("uColor");
     }
     
-    IsoPipeline::IsoPipeline() : Pipeline("shaders/iso.vs", "shaders/iso.gs", "shaders/phong_shading.fs", PipelineType::MARKER) {
+    IsoPipeline::IsoPipeline() : Pipeline("shaders/iso.vs", "shaders/iso.gs", "shaders/phong_shading.fs", PipelineType::ISO) {
         uMVP = get_uniform_var("uMVP");
         uM = get_uniform_var("uM");
         uIsoValue = get_uniform_var("uIsoValue");

@@ -38,7 +38,8 @@ private:
     bool is_spatial_model_init = true;
     bool is_field_model_init = true;
     bool trait_handler_pending = false;
-    
+    bool clear_handler_pending = false;
+
     sigc::connection file_loader_conn;
     std::unique_ptr<MVF::LoadProxy> loader;
     std::shared_ptr<MVF::VolumeData> data;

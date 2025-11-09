@@ -1,6 +1,10 @@
 # MVF
 Multivariate field visualizer (MVF) is a tool that helps user visualize multivariate fields (fields with more than or equal to a single component. Ex: Scalar, Vector, Tensor field etc).
 
+
+![Bonsai tree model](assets/result.png "Distance field generated from a 1d trait (isosurface) on a bonsai tree model")
+
+
 ## Field visualization
 The tool currently supports loading Visualization toolkit (VTK) files. The user can then select an appropriate number of components from the field and then visualize it. This visualization could take the form of a slice for a scalar field or an arrow glyph for vector fields (these options can be configured) etc.
 
