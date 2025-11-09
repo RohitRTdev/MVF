@@ -191,7 +191,15 @@ namespace MVF {
         if (field_comps.size() != 1 && field_comps.size() != 2) {
             return;
         }
+        
+        auto x_bound = AXIS_LENGTH / 2;
+        auto y_bound = field_comps.size() == 1 ? DETECT_THRESHOLD :  AXIS_LENGTH / 2;
+        
+        if (std::abs(y_ndc) > y_bound || std::abs(x_ndc) > x_bound) {
+            return;
+        }
 
+        handle_traits = true;
         make_current();
         field_comps.size() == 1 ? static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc) : 
         static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc, y_ndc);

@@ -95,13 +95,14 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
     auto dim_label = make_managed<Label>("Dimensions");
     auto trait_box = make_managed<Box>();
     auto trait_label = make_managed<Label>("Trait selection");
+    apply_button = Button("Apply");
+    apply_button.set_hexpand(false);
     trait_sel.append("Point");
     trait_sel.append("Range");
     dim_menu.append("0");
     dim_menu.set_active(0);
     trait_sel.set_active(0);
-    dim_menu.set_sensitive(false);
-    trait_sel.set_sensitive(false);
+    change_state(state);
     dim_menu.signal_changed().connect([this]() {
         if (!this->data) {
             return;
@@ -135,10 +136,12 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
     
     auto spacer = make_managed<Box>(Orientation::VERTICAL);
     spacer->set_vexpand(true);
-    
+   
+    vbox->set_spacing(5);
     vbox->append(show_attrib);
     vbox->append(*dim_box);
     vbox->append(*trait_box);
+    vbox->append(apply_button);
     vbox->append(*spacer);
 
     set_child(*vbox);
@@ -147,13 +150,31 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
 void AttributePanel::disable_panel() {
     state.dim_menu_state = dim_menu.get_sensitive();
     state.trait_sel_state = trait_sel.get_sensitive();
+    state.apply_button_state = apply_button.get_sensitive();
     dim_menu.set_sensitive(false);
     trait_sel.set_sensitive(false);
+    apply_button.set_sensitive(false);
 }
 
 void AttributePanel::enable_panel() {
+    change_state(state);
+}
+
+void AttributePanel::change_state(const PanelState& state) {
+    this->state = state;
     dim_menu.set_sensitive(state.dim_menu_state);
     trait_sel.set_sensitive(state.trait_sel_state);
+    apply_button.set_sensitive(state.apply_button_state);
+}
+    
+void AttributePanel::set_button_active() {
+    state.apply_button_state = true;
+    apply_button.set_sensitive(true);
+}
+
+void AttributePanel::set_button_inactive() {
+    state.apply_button_state = false;
+    apply_button.set_sensitive(false);
 }
 
 void AttributePanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
@@ -169,8 +190,54 @@ void AttributePanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
         dim_menu.append(std::to_string(i));
     }
 
-    dim_menu.set_sensitive(true);
-    trait_sel.set_sensitive(false);
+    change_state({true, false, false});
     static_cast<MVF::AttribRenderer*>(handler->renderer)->set_field_data(this->data);
+    handler->queue_render();
+}
+
+FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler) {
+    set_label("Feature panel");
+
+    rep_menu.append("Isosurface");
+    rep_menu.append("DVR");
+    rep_menu.set_active(0);
+    //rep_menu.set_sensitive(false);
+
+    auto vbox = make_managed<Box>(Orientation::VERTICAL);
+    auto rep_box = make_managed<Box>();
+    auto rep_label = make_managed<Label>("Representation");
+    rep_box->set_spacing(5);
+    rep_box->set_margin(5);
+    rep_box->append(*rep_label);
+    rep_box->append(rep_menu);
+    
+    // Create a horizontal slider
+    auto adjustment = Gtk::Adjustment::create(0.0, 0.0, 1.0, 0.01, 0.1);
+
+    iso_slider.set_adjustment(adjustment);
+    iso_slider.set_value_pos(Gtk::PositionType::LEFT);
+    iso_slider.set_digits(2);
+    //iso_slider.set_margin(10);
+    iso_slider.set_draw_value(true); 
+    //iso_slider.set_sensitive(false);
+
+    iso_slider.signal_value_changed().connect([this]() {
+        std::cout << "Slider value: " << iso_slider.get_value() << std::endl;
+    });
+
+    auto spacer = make_managed<Box>(Orientation::VERTICAL);
+    spacer->set_vexpand(true);
+    
+    vbox->append(*rep_box);
+    vbox->append(iso_slider);
+    vbox->append(*spacer);
+    set_child(*vbox);
+}
+
+void FieldPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
+    auto field_renderer = static_cast<MVF::FieldRenderer*>(handler->renderer);
+
+    handler->make_current();
+    field_renderer->setup_scene(data);
     handler->queue_render();
 }

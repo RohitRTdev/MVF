@@ -5,6 +5,7 @@
 #include "math_utils.h"
 #include "shapes.h"
 #include "pipeline.h"
+#include "attrib.h"
 
 enum class EntityMode {
     NONE,
@@ -26,6 +27,7 @@ struct EntityRepresentation {
 
 namespace MVF {
     class SpatialRenderer;
+    class FieldRenderer;
 
     class Entity {
     public:
@@ -71,15 +73,20 @@ namespace MVF {
         void reset_transform(); 
         void resync();
         friend SpatialRenderer;
+        friend FieldRenderer;
+
+    protected:
+        std::shared_ptr<VolumeData> model;
+        Matrix4f init_transform;
+        Matrix4f scale_transform;
+        
+        void draw() override;
     
     private:
-        std::shared_ptr<VolumeData> model;
         EntityRepresentation type;    
         BoundingBox box; 
         ArrowMesh arrow_mesh;
         GlyphMesh field_mesh;
-        Matrix4f init_transform;
-        Matrix4f scale_transform;
         ArrowBufferEntity arrow_buffer;
         BoxBufferEntity box_buffer;
         VectorBufferEntity vec_buffer;
@@ -96,15 +103,31 @@ namespace MVF {
         void create_vertex_array();
         void create_bounding_box_buffers(); 
         void create_buffers();
-
-        void draw() override;
     };
 
     class FieldEntity : public VolumeEntity {
     public:
         
         FieldEntity();
-        void set_traits();
+        void init();
+        void set_traits(const std::vector<AxisDesc>& attrib_comps, const std::vector<Trait>& traits);
+        friend FieldRenderer;
+    
+    private:
+       
+        GLuint vao, vbo;
+        GLuint tex3d;
+        Vector3f steps;
+        const size_t res_x = 100, res_y = 100, res_z = 100;
+        size_t iso_value = 0;
+        std::vector<Vertex> points;
+        std::vector<float> field;
+        bool set_draw_mode = false;
+
+        void create_voxel_grid();
+        void create_buffers();
+        
+        void draw() override;
     };
 
     class CameraEntity : public Entity {
@@ -114,6 +137,7 @@ namespace MVF {
         void rotate(float angleX, float angleY, float angleZ) override;
 
         friend SpatialRenderer;
+        friend FieldRenderer;
     private:
         Vector3f target;
         Vector3f up;

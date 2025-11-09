@@ -33,18 +33,36 @@ public:
     void load_model(std::shared_ptr<MVF::VolumeData>& data);
     void disable_panel();
     void enable_panel();
-
+    void set_button_active();
+    void set_button_inactive();
+    
     friend MainWindow;
 private:
     
     struct PanelState {
         bool dim_menu_state;
         bool trait_sel_state;
+        bool apply_button_state;
     };
 
     MVF::AttribHandler* handler;
     Gtk::ComboBoxText dim_menu, trait_sel;
     Gtk::CheckButton show_attrib;
+    Gtk::Button apply_button;
     size_t max_dim = 0;
-    PanelState state = {false, false};
+    PanelState state = {false, false, false};
+
+    void change_state(const PanelState& state);
+};
+
+class FieldPanel : public MVFPanel {
+public: 
+    FieldPanel(MVF::SpatialHandler* handler);
+    void load_model(std::shared_ptr<MVF::VolumeData>& data);
+
+private:
+
+    MVF::SpatialHandler* handler;
+    Gtk::ComboBoxText rep_menu;
+    Gtk::Scale iso_slider;
 };

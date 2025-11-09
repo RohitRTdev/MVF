@@ -43,7 +43,10 @@ namespace MVF {
 
     class FieldRenderer : public SpatialRenderer {
     public:
+    
         FieldEntity entity;
+        void init(int width, int height);
+        void render() override;
     };
 
     class AttribRenderer : public Renderer {

@@ -33,11 +33,15 @@ private:
     void toggle_attrib_space();
     Gtk::Box* build_menu(const std::vector<ButtonDescriptor>& desc);
 
-    bool is_toggle_on = false;
     bool is_attrib_space_visible = false;
-
+    bool is_feature_space_visible = true;
+    bool is_spatial_model_init = true;
+    bool is_field_model_init = true;
+    bool trait_handler_pending = false;
+    
     sigc::connection file_loader_conn;
     std::unique_ptr<MVF::LoadProxy> loader;
+    std::shared_ptr<MVF::VolumeData> data;
     std::string vtk_filename;
 
     Gtk::Box m_vbox{Gtk::Orientation::VERTICAL};
@@ -55,6 +59,7 @@ private:
     MVF::FieldRenderer field_renderer;
     SpatialPanel spatial_panel;
     AttributePanel attrib_panel; 
+    FieldPanel field_panel;
 
     OverlayProgressBar progress_bar;
 };

@@ -8,7 +8,8 @@ namespace MVF {
         // Spatial domain
         VEC_GLYPH = 0,
         BOX,
-
+        ISO,
+        
         // Attribute domain
         AXIS = 0,
         MARKER
@@ -53,5 +54,14 @@ namespace MVF {
     struct MarkerPipeline: Pipeline {
         GLuint uColor;
         MarkerPipeline();    
+    };
+
+    struct IsoPipeline: Pipeline {
+        GLuint uMVP, uM;
+        GLuint uIsoValue, uOrigin;
+        GLuint uLimits, uSpacing;
+        GLuint uSteps;
+        GLuint uLightPos, uViewPos;
+        IsoPipeline();    
     };
 }

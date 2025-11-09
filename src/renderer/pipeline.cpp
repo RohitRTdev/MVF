@@ -103,7 +103,7 @@ namespace MVF{
         return u_var;
     }
     
-    VecGlyphPipeline::VecGlyphPipeline() : Pipeline("shaders/vec_glyph.vs", "shaders/vec_glyph.fs", PipelineType::VEC_GLYPH) {
+    VecGlyphPipeline::VecGlyphPipeline() : Pipeline("shaders/vec_glyph.vs", "shaders/phong_shading.fs", PipelineType::VEC_GLYPH) {
         uMVP = get_uniform_var("uMVP");
         uM = get_uniform_var("uM");
         uLightPos = get_uniform_var("uLightPos");
@@ -122,12 +122,26 @@ namespace MVF{
     MarkerPipeline::MarkerPipeline() : Pipeline("shaders/marker.vs", "shaders/solid_color.fs", PipelineType::MARKER) {
         uColor = get_uniform_var("uColor");
     }
+    
+    IsoPipeline::IsoPipeline() : Pipeline("shaders/iso.vs", "shaders/iso.gs", "shaders/phong_shading.fs", PipelineType::MARKER) {
+        uMVP = get_uniform_var("uMVP");
+        uM = get_uniform_var("uM");
+        uIsoValue = get_uniform_var("uIsoValue");
+        uOrigin = get_uniform_var("uOrigin");
+        uLimits = get_uniform_var("uLimits");
+        uSpacing = get_uniform_var("uSpacing");
+        uSteps = get_uniform_var("uSteps");
+        uLightPos = get_uniform_var("uLightPos");
+        uViewPos = get_uniform_var("uViewPos");
+        
+        glUniform1i(glGetUniformLocation(shader_program, "volume_tex"), 0);
+    }
 
     std::vector<Pipeline*> Pipeline::init_pipelines(bool is_spatial_pipeline) {
         std::vector<Pipeline*> pipelines;
         if (is_spatial_pipeline) {
             // *This must follow the same order as of the PipelineType enum class*
-            pipelines = {new VecGlyphPipeline(), new BoxPipeline()};
+            pipelines = {new VecGlyphPipeline(), new BoxPipeline(), new IsoPipeline()};
 #ifdef MVF_DEBUG
         std::cout << "Created spatial pipeline of size: " << pipelines.size() << std::endl;
 #endif

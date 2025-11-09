@@ -7,7 +7,7 @@
 using namespace Gtk;
 
 MainWindow::MainWindow() : spatial_handler(&spatial_renderer), field_handler(&field_renderer), attrib_handler(&attrib_renderer), 
-spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
+spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&field_handler) {
     extern MVF::ErrorBox main_error_box;
     
     set_title("MVF");
@@ -17,6 +17,13 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     m_vbox.append(m_menubox);
     m_vbox.append(m_hbox);
     m_hbox.append(m_uibox);
+    
+    auto key_controller_spatial = Gtk::EventControllerKey::create();
+    key_controller_spatial->signal_key_pressed().connect(sigc::mem_fun(spatial_handler, &MVF::SpatialHandler::on_key_pressed), false);
+    add_controller(key_controller_spatial);
+    
+    auto key_controller_field = Gtk::EventControllerKey::create();
+    key_controller_field->signal_key_pressed().connect(sigc::mem_fun(field_handler, &MVF::SpatialHandler::on_key_pressed), false);
 
     auto spatial_hbox = build_menu({
         {
@@ -29,8 +36,23 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
         {
             .tooltip_text = "Switch to distance field",
             .icon_filename = "assets/toggle-on.png",
-            .handler = [this] {
-                pane.set_start_child(field_box); 
+            .handler = [this, key_controller_spatial, key_controller_field] {
+                pane.set_start_child(field_box);
+                m_uibox.remove(spatial_panel);
+                m_uibox.prepend(field_panel);
+                
+                if (!is_field_model_init) {
+                    field_panel.load_model(data);
+                }
+                is_field_model_init = true;
+                is_feature_space_visible = false;
+                remove_controller(key_controller_spatial);
+                add_controller(key_controller_field);
+
+                if (trait_handler_pending) {
+                    attrib_panel.set_button_active();
+                    trait_handler_pending = false;
+                }
             }
         }
     });
@@ -54,8 +76,23 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
         {
             .tooltip_text = "Switch to domain space",
             .icon_filename = "assets/toggle-off.png",
-            .handler = [this] {
+            .handler = [this, key_controller_spatial, key_controller_field] {
                 pane.set_start_child(spatial_box); 
+                m_uibox.remove(field_panel);
+                m_uibox.prepend(spatial_panel);
+
+                if (!is_spatial_model_init) {
+                    spatial_panel.load_model(data);
+                }
+                is_spatial_model_init = true;
+                is_feature_space_visible = true;
+                remove_controller(key_controller_field);
+                add_controller(key_controller_spatial);
+
+                if (attrib_panel.state.apply_button_state) {
+                    attrib_panel.set_button_inactive();
+                    trait_handler_pending = true;
+                }
             }
         }
     });
@@ -103,11 +140,29 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     set_child(m_vbox);
     
     set_focusable(true); 
-    auto key_controller = Gtk::EventControllerKey::create();
-    key_controller->signal_key_pressed().connect(sigc::mem_fun(spatial_handler, &MVF::SpatialHandler::on_key_pressed), false);
-    add_controller(key_controller);
     
     attrib_panel.show_attrib.signal_toggled().connect(sigc::mem_fun(*this, &MainWindow::toggle_attrib_space));
+
+    auto mouse_click = GestureClick::create();
+    mouse_click->signal_pressed().connect([this] (int, double, double) {
+        if (attrib_handler.handle_traits) {
+            if (is_feature_space_visible) {
+                trait_handler_pending = true;
+            }
+            else {
+                attrib_panel.set_button_active();
+            }
+            attrib_handler.handle_traits = false;
+        }
+    });
+
+    attrib_panel.apply_button.signal_clicked().connect([this] {
+        std::cout << "Apply button clicked..." << std::endl;
+        attrib_panel.set_button_inactive();
+        trait_handler_pending = false;
+    });
+
+    add_controller(mouse_click);
 
     signal_close_request().connect(sigc::mem_fun(*this, &MainWindow::on_window_close), false);
 }
@@ -219,7 +274,17 @@ bool MainWindow::file_load_handler() {
         std::cout << "Spacing: " << loader->data->spacing.x << ',' << loader->data->spacing.y << ',' << loader->data->spacing.z << std::endl;
 #endif           
 
-        spatial_panel.load_model(loader->data);
+        data = loader->data;
+        // We tell MainWindow to hold off on loading the scene if that view is hidden
+        // When view is realized later, the UI calls view's load_model function
+        if (is_feature_space_visible) {
+            spatial_panel.load_model(loader->data);
+            is_field_model_init = false;
+        }
+        else {
+            field_panel.load_model(loader->data);
+            is_spatial_model_init = false;
+        }
         attrib_panel.load_model(loader->data);
 
         return false;

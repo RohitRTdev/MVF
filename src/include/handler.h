@@ -6,6 +6,7 @@
 
 class MainWindow;
 class SpatialPanel;
+class FieldPanel;
 class AttributePanel;
 
 namespace MVF {
@@ -30,6 +31,7 @@ namespace MVF {
         void reset_camera();
         friend MainWindow;
         friend SpatialPanel;
+        friend FieldPanel;
 
     private:
         bool on_key_pressed(guint keyval, guint keycode, Gdk::ModifierType state);
@@ -43,6 +45,7 @@ namespace MVF {
         friend AttributePanel;
 
     private:
+        bool handle_traits = false;
         HoverOverlay mouse_overlay;
         std::vector<std::string> field_comps;
         void on_mouse_click(int n_press, double x, double y);
