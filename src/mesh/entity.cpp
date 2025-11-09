@@ -29,13 +29,7 @@ namespace MVF {
         type.mode = EntityMode::NONE;
     }
    
-    void VolumeEntity::destroy_buffers(bool destroy_static_buffers) {
-        if (arrow_buffer.is_active && destroy_static_buffers) {
-            glDeleteVertexArrays(1, &arrow_buffer.vao_vec_glyph);
-            glDeleteBuffers(2, std::array{arrow_buffer.vbo_arrow_mesh, arrow_buffer.ebo_arrow_mesh}.data());
-            arrow_buffer.is_active = false;
-        }
-
+    void VolumeEntity::destroy_buffers() {
         if (box_buffer.is_active) {
             glDeleteVertexArrays(1, &box_buffer.vao_bound_box);
             glDeleteBuffers(2, std::array{box_buffer.vbo_box, box_buffer.ebo_box}.data());

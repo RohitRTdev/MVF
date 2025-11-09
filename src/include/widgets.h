@@ -15,7 +15,7 @@ private:
 
 class HoverOverlay : public Gtk::Popover {
 public:
-    HoverOverlay(Gtk::Widget& parent);
+    HoverOverlay();
     void show_at(int x, int y, const std::string& text);
     void hide_now();
 

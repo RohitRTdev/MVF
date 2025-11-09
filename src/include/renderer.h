@@ -13,7 +13,6 @@ namespace MVF {
         Renderer();
         virtual void render() = 0;
         virtual void resync() = 0;
-        virtual void unload() = 0;
         virtual void init(int width, int height);
         void set_viewport(int width, int height);
     
@@ -37,10 +36,14 @@ namespace MVF {
 
         void render() override;
         void resync() override;
-        void unload() override;
     
     private:
         bool is_scene_setup = false;
+    };
+
+    class FieldRenderer : public SpatialRenderer {
+    public:
+        FieldEntity entity;
     };
 
     class AttribRenderer : public Renderer {
@@ -48,7 +51,6 @@ namespace MVF {
         
         void init(int width, int height) override;
 
-        void unload() override;
         void render() override;
         void resync() override;
     
@@ -67,5 +69,6 @@ namespace MVF {
         std::vector<AxisDescMeta> descriptors;
         std::vector<Trait> traits;
         void setup_buffers(); 
+        void setup_traits();
     };
 }

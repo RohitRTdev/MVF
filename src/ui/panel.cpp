@@ -88,6 +88,9 @@ void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
 AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
     set_label("Attribute panel");
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
+
+    show_attrib = CheckButton("Show attribute space");
+
     auto dim_box = make_managed<Box>();
     auto dim_label = make_managed<Label>("Dimensions");
     auto trait_box = make_managed<Box>();
@@ -133,11 +136,24 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
     auto spacer = make_managed<Box>(Orientation::VERTICAL);
     spacer->set_vexpand(true);
     
+    vbox->append(show_attrib);
     vbox->append(*dim_box);
     vbox->append(*trait_box);
     vbox->append(*spacer);
 
     set_child(*vbox);
+}
+    
+void AttributePanel::disable_panel() {
+    state.dim_menu_state = dim_menu.get_sensitive();
+    state.trait_sel_state = trait_sel.get_sensitive();
+    dim_menu.set_sensitive(false);
+    trait_sel.set_sensitive(false);
+}
+
+void AttributePanel::enable_panel() {
+    dim_menu.set_sensitive(state.dim_menu_state);
+    trait_sel.set_sensitive(state.trait_sel_state);
 }
 
 void AttributePanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
@@ -155,7 +171,6 @@ void AttributePanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
 
     dim_menu.set_sensitive(true);
     trait_sel.set_sensitive(false);
-    handler->make_current();
     static_cast<MVF::AttribRenderer*>(handler->renderer)->set_field_data(this->data);
     handler->queue_render();
 }

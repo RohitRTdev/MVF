@@ -37,10 +37,6 @@ namespace MVF {
 		entity.resync();
 	}
 	
-	void SpatialRenderer::unload() {
-		entity.destroy_buffers();
-	}
-
 	void SpatialRenderer::init(int width, int height) {
 		Renderer::init(width, height);
 		glClearColor(0.25f, 0.25f, 0.27f, 1.0f);
@@ -89,7 +85,7 @@ namespace MVF {
 			return;
 		}
 
-		entity.destroy_buffers(false);
+		entity.destroy_buffers();
 		is_scene_setup = false;
 	} 
 

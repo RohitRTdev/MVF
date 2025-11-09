@@ -6,7 +6,7 @@
 
 using namespace Gtk;
 
-MainWindow::MainWindow() : spatial_handler(&spatial_renderer), attrib_handler(&attrib_renderer), 
+MainWindow::MainWindow() : spatial_handler(&spatial_renderer), field_handler(&field_renderer), attrib_handler(&attrib_renderer), 
 spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     extern MVF::ErrorBox main_error_box;
     
@@ -18,57 +18,69 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     m_vbox.append(m_hbox);
     m_hbox.append(m_uibox);
 
-    auto pane = make_managed<Paned>();
-    auto spatial_hbox = make_managed<Box>();
-    spatial_hbox->set_spacing(5);
-    spatial_hbox->set_css_classes({"main-vbox"});
-    spatial_hbox->set_hexpand(true);
-    auto attrib_hbox = make_managed<Box>();
-    attrib_hbox->set_spacing(5);
-    attrib_hbox->set_css_classes({"main-vbox"});
-    attrib_hbox->set_hexpand(true);
-    auto dist_fld_button = make_managed<Button>();
-    auto reset_button = make_managed<Button>();
-    auto dist_fld_icon = Image("assets/toggle-on.png");
-    auto reset_icon = Image("assets/reset.png");
-    auto reset_attrib_button = make_managed<Button>();
-    auto reset_attrib_icon = Image("assets/reset.png");
-    dist_fld_button->set_child(dist_fld_icon);
-    reset_button->set_child(reset_icon);
-    reset_attrib_button->set_child(reset_attrib_icon);
-    reset_button->set_has_frame(false);
-    reset_button->set_tooltip_text("Reset camera");
-    dist_fld_button->set_has_frame(false);
-    dist_fld_button->set_tooltip_text("Switch to distance field");
-    reset_attrib_button->set_has_frame(false);
-    reset_attrib_button->set_tooltip_text("Clear traits");
-    
-    reset_button->signal_clicked().connect([this] {
-        spatial_handler.reset_camera();
+    auto spatial_hbox = build_menu({
+        {
+            .tooltip_text = "Reset camera",
+            .icon_filename = "assets/reset.png",
+            .handler = [this] {
+                spatial_handler.reset_camera();
+            }
+        }, 
+        {
+            .tooltip_text = "Switch to distance field",
+            .icon_filename = "assets/toggle-on.png",
+            .handler = [this] {
+                pane.set_start_child(field_box); 
+            }
+        }
     });
-   
-    spatial_hbox->append(*reset_button);
-    spatial_hbox->append(*dist_fld_button);
+    
+    auto attrib_hbox = build_menu({
+        {
+            .tooltip_text = "Clear traits",
+            .icon_filename = "assets/reset.png",
+            .handler = []{}
+        }
+    });
+
+    auto field_hbox = build_menu({
+        {
+            .tooltip_text = "Reset camera",
+            .icon_filename = "assets/reset.png",
+            .handler = [this] {
+                field_handler.reset_camera();
+            }
+        },
+        {
+            .tooltip_text = "Switch to domain space",
+            .icon_filename = "assets/toggle-off.png",
+            .handler = [this] {
+                pane.set_start_child(spatial_box); 
+            }
+        }
+    });
+
     spatial_box.append(*spatial_hbox);
     spatial_box.append(spatial_handler);
-    attrib_hbox->append(*reset_attrib_button);
     attrib_box.append(*attrib_hbox);
     attrib_box.append(attrib_handler);
+    field_box.append(*field_hbox);
+    field_box.append(field_handler);
     spatial_box.set_hexpand(true);
     attrib_box.set_hexpand(true);
-    pane->set_start_child(spatial_box);
-    pane->set_end_child(attrib_box);
-    pane->set_css_classes({"draw-board"});
+    field_box.set_hexpand(true);
+    pane.set_start_child(spatial_box);
+    pane.set_css_classes({"draw-board"});
    
-    pane->signal_realize().connect([pane]() {
+    pane.signal_realize().connect([this]() {
         // Wait for one main loop iteration so allocation is ready
-        Glib::signal_idle().connect_once([pane]() {
-            int width = pane->get_allocated_width();
+        Glib::signal_idle().connect_once([this] () {
+            int width = pane.get_allocated_width();
             if (width > 0)
-                pane->set_position(width / 2);
+                pane.set_position(width / 2);
         });
     });
-    m_hbox.append(*pane);
+    m_hbox.append(pane);
 
     spatial_panel.set_vexpand(true);
     attrib_panel.set_vexpand(true);
@@ -94,10 +106,46 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler) {
     auto key_controller = Gtk::EventControllerKey::create();
     key_controller->signal_key_pressed().connect(sigc::mem_fun(spatial_handler, &MVF::SpatialHandler::on_key_pressed), false);
     add_controller(key_controller);
+    
+    attrib_panel.show_attrib.signal_toggled().connect(sigc::mem_fun(*this, &MainWindow::toggle_attrib_space));
 
     signal_close_request().connect(sigc::mem_fun(*this, &MainWindow::on_window_close), false);
 }
-    
+
+void MainWindow::toggle_attrib_space() {
+    if (is_attrib_space_visible) {
+        pane.unset_end_child();
+        attrib_panel.disable_panel();
+    }
+    else {
+        pane.set_end_child(attrib_box);
+        attrib_panel.enable_panel();
+    }
+
+    is_attrib_space_visible = !is_attrib_space_visible;
+}
+
+Gtk::Box* MainWindow::build_menu(const std::vector<ButtonDescriptor>& desc) {
+    auto hbox = make_managed<Box>();
+    hbox->set_spacing(5);
+    hbox->set_css_classes({"main-vbox"});
+    hbox->set_hexpand(true);
+
+    for (auto& val: desc) {
+        auto button = make_managed<Button>();
+        auto icon = make_managed<Image>(val.icon_filename);
+        button->set_child(*icon);
+        button->set_tooltip_text(val.tooltip_text);
+        button->set_has_frame(false);
+        
+        button->signal_clicked().connect(val.handler);
+        hbox->append(*button);
+    }
+
+    return hbox;
+}
+
+
 bool MainWindow::on_window_close() {
     if (file_loader_conn.connected()) {
         loader->cancel_io();

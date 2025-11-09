@@ -40,10 +40,9 @@ void OverlayProgressBar::set_fraction(double frac) {
     label_progress.set_text(std::to_string(pct) + "%");
 }
 
-HoverOverlay::HoverOverlay(Gtk::Widget& parent) {
+HoverOverlay::HoverOverlay() {
     set_has_arrow(false);
     set_autohide(false); 
-    set_parent(parent);
     set_can_target(false);
     set_can_focus(false);
     set_position(Gtk::PositionType::RIGHT);

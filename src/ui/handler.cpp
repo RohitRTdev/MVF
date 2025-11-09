@@ -68,8 +68,6 @@ namespace MVF {
         std::cout << "Unrealizing GL context..." << std::endl;
 #endif
         Gtk::GLArea::on_unrealize();
-        
-        renderer->unload();
     }
 
     bool RenderHandler::on_render(const Glib::RefPtr<Gdk::GLContext>& context) {
@@ -80,7 +78,7 @@ namespace MVF {
     SpatialHandler::SpatialHandler(SpatialRenderer* renderer) : RenderHandler(renderer)
     {}
 
-    AttribHandler::AttribHandler(AttribRenderer* renderer) : RenderHandler(renderer), mouse_overlay(*this) {
+    AttribHandler::AttribHandler(AttribRenderer* renderer) : RenderHandler(renderer) {
         auto mouse_click = Gtk::GestureClick::create();
         mouse_click->set_button(GDK_BUTTON_PRIMARY);
         mouse_click->signal_pressed().connect(sigc::mem_fun(*this, &AttribHandler::on_mouse_click));
@@ -105,8 +103,17 @@ namespace MVF {
             }
             this->mouse_overlay.show_at(static_cast<int>(x), static_cast<int>(y), text);
         });
+
+        motion->signal_leave().connect([this] {
+            mouse_overlay.hide_now();
+        });
+
         add_controller(motion);
-    
+   
+        signal_realize().connect([this] {
+            mouse_overlay.set_parent(*this);
+        });
+
         signal_unrealize().connect([this] {
             mouse_overlay.unparent();
         });

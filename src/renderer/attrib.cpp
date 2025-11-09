@@ -51,10 +51,25 @@ namespace MVF {
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), 0);
         glVertexAttribDivisor(1, 1);
         
-        glBindVertexArray(0); 
+        glBindVertexArray(0);
+        
+        setup_traits();
+
 #ifdef MVF_DEBUG
         std::cout << "Created attribute space static mesh buffers..." << std::endl;
 #endif
+    }
+    
+    void AttribRenderer::setup_traits() {
+        if (!traits.size()) {
+            return;
+        }
+        
+        auto vertices = traits | std::views::transform([] (auto& trait) {return std::get<Point>(trait.data);})
+        | std::ranges::to<std::vector>();
+            
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_marker_pos);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Point), vertices.data(), GL_DYNAMIC_DRAW);
     }
     
     void AttribRenderer::set_field_data(std::shared_ptr<VolumeData>& vol) {
@@ -112,14 +127,6 @@ namespace MVF {
         glBindVertexArray(0);
     }
 
-    void AttribRenderer::unload() {
-        glDeleteVertexArrays(3, std::array{vao_x_axis, vao_y_axis, vao_marker}.data());
-        glDeleteBuffers(3, std::array{vbo_x_axis, vbo_y_axis, vbo_marker}.data());    
-#ifdef MVF_DEBUG
-        std::cout << "Deleted axis mesh buffers..." << std::endl;
-#endif
-    }
-        
     void AttribRenderer::resync() {
         setup_buffers();
     }
