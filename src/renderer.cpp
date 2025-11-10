@@ -115,14 +115,45 @@ namespace MVF {
 		glUseProgram(pipeline_box->shader_program);
 		glUniformMatrix4fv(pipeline_box->uMVP, 1, GL_TRUE, &mvp.m[0][0]);
 		glUniform3fv(pipeline_box->uColor, 1, (float*)&box_color);
-		auto pipeline_vec = reinterpret_cast<VecGlyphPipeline*>(pipelines[static_cast<int>(PipelineType::VEC_GLYPH)]);
-		glUseProgram(pipeline_vec->shader_program);
-		
-		glUniformMatrix4fv(pipeline_vec->uM, 1, GL_TRUE, &entity.world.m[0][0]);
-		glUniformMatrix4fv(pipeline_vec->uMVP, 1, GL_TRUE, &mvp.m[0][0]);
-		glUniform3fv(pipeline_vec->uLightPos, 1, light_position);
-		glUniform3fv(pipeline_vec->uViewPos, 1, camera_position);
-		
+
+        if (entity.get_mode() == EntityMode::VECTOR_GLYPH) {
+            auto pipeline_vec = reinterpret_cast<VecGlyphPipeline*>(pipelines[static_cast<int>(PipelineType::VEC_GLYPH)]);
+            glUseProgram(pipeline_vec->shader_program);
+            
+            glUniformMatrix4fv(pipeline_vec->uM, 1, GL_TRUE, &entity.world.m[0][0]);
+            glUniformMatrix4fv(pipeline_vec->uMVP, 1, GL_TRUE, &mvp.m[0][0]);
+            glUniform3fv(pipeline_vec->uLightPos, 1, light_position);
+            glUniform3fv(pipeline_vec->uViewPos, 1, camera_position);
+        }
+        else if (entity.get_mode() == EntityMode::SCALAR_SLICE) {
+            auto pipeline_slice = reinterpret_cast<SlicePipeline*>(pipelines[static_cast<int>(PipelineType::SLICE)]);
+            glUseProgram(pipeline_slice->shader_program);
+            glUniformMatrix4fv(pipeline_slice->uMVP, 1, GL_TRUE, &mvp.m[0][0]);
+            glUniform1i(pipeline_slice->uTex, 0);
+        }
+        else if (entity.get_mode() == EntityMode::DVR) {
+            auto pipeline_dvr = reinterpret_cast<DvrPipeline*>(pipelines[static_cast<int>(PipelineType::DVR)]);
+            glUseProgram(pipeline_dvr->shader_program);
+            glUniformMatrix4fv(pipeline_dvr->uMVP, 1, GL_TRUE, &mvp.m[0][0]);
+            Vector3f bbmin = entity.box.vertices[0];
+            Vector3f bbmax = entity.box.vertices[6];
+            glUniform3fv(pipeline_dvr->uBBoxMin, 1, (float*)&bbmin);
+            glUniform3fv(pipeline_dvr->uBBoxMax, 1, (float*)&bbmax);
+            glUniform1i(pipeline_dvr->uTex3D, 0);
+            glUniform1i(pipeline_dvr->uSlices, 128);
+            glUniform1f(pipeline_dvr->uAlphaScale, 0.15f);
+            // Disable depth writes & testing for proper alpha compositing of proxy slices
+            glDisable(GL_DEPTH_TEST);
+            entity.draw();
+            glEnable(GL_DEPTH_TEST);
+            return; // already drawn entity and box
+        }
+
 		entity.draw();
+	}
+
+	void SpatialRenderer::set_world_orientation(const Matrix4f& R) {
+		// keep only orientation, preserve scale and init transform in render path
+		entity.world = R;
 	}
 }

@@ -21,22 +21,36 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler) {
         auto spatial_renderer = static_cast<MVF::SpatialRenderer*>(this->handler->renderer);
         if (text == "Volume" && selected_mode != Selection::VOLUME) {
             this->handler->make_current();
-            std::vector<MVF::AxisDesc> desc(1);
             std::vector<std::string> keys;
             for (auto& [key, _]: data->scalars) {
                 keys.push_back(key);
             }
-            spatial_renderer->entity.set_vector_mode(keys[0], keys[1], keys[2]);
+            if (keys.size() >= 3) {
+                spatial_renderer->entity.set_vector_mode(keys[0], keys[1], keys[2]);
+            }
             this->handler->queue_render();
-            desc.push_back(MVF::AxisDesc{});
-
             selected_mode = Selection::VOLUME;
+        }
+        else if (text == "Slice" && selected_mode != Selection::SLICE) {
+            this->handler->make_current();
+            std::string key;
+            for (auto& [k,_]: data->scalars) { key = k; break; }
+            spatial_renderer->entity.set_scalar_slice(key, 2);
+            this->handler->queue_render();
+            selected_mode = Selection::SLICE;
+        }
+        else if (text == "DVR" && selected_mode != Selection::DVR) {
+            this->handler->make_current();
+            std::string key;
+            for (auto& [k,_]: data->scalars) { key = k; break; }
+            spatial_renderer->entity.set_dvr(key);
+            this->handler->queue_render();
+            selected_mode = Selection::DVR;
         }
         else if (text == "None" && selected_mode != Selection::NONE) {
             this->handler->make_current();
             spatial_renderer->setup_scene(data);
             this->handler->queue_render();
-
             selected_mode = Selection::NONE;
         }
     });
@@ -56,32 +70,28 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler) {
 }
 
 void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
-    bool append_option = false;
-    rep_menu.set_active(0);
-    if (!this->data || this->data->scalars.size() < 3) {
-        append_option = true;
-    }
-
     this->data = data;
-    if (append_option) {
-        if (this->data->scalars.size() >= 3) {
-            rep_menu.append("Volume");
+    // Clear all but first entry (None) to avoid duplicates
+    while (rep_menu.get_model()->children().size() > 1) {
+        for (int i = rep_menu.get_model()->children().size() - 1; i >= 1; --i) {
+            rep_menu.remove_text(i);
         }
     }
-    else {
-        if (this->data->scalars.size() < 3) {
-            rep_menu.remove_text(1);
-        }
-    }
-    
-    auto spatial_renderer = static_cast<MVF::SpatialRenderer*>(handler->renderer);
 
+    if (data->scalars.size() >= 3) {
+        rep_menu.append("Volume");
+    }
+    if (data->scalars.size() >= 1) {
+        rep_menu.append("Slice");
+        rep_menu.append("DVR");
+    }
+    rep_menu.set_active(0);
+
+    auto spatial_renderer = static_cast<MVF::SpatialRenderer*>(handler->renderer);
     handler->make_current();
     spatial_renderer->setup_scene(data);
     handler->queue_render();
 }
-
-
 
 AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
     set_label("Attribute panel");
@@ -95,22 +105,16 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
             return;
         }
 
-        size_t value = std::stoi(dim_menu.get_active_text());
-        
+        size_t value = std::stoul(dim_menu.get_active_text());
         this->handler->make_current();
-        
-        // For now, just select the first n fields from the data
         std::vector<MVF::AxisDesc> desc;
-        size_t i = 0;
-        for (auto& [name, _]: this->data->scalars) {
-            desc.push_back(MVF::AxisDesc{.comp_name = name, .derive = [](float val) {return val;}});
-            i++;
-
-            if (i >= value) {
-                break;
-            }
+        size_t count = 0;
+        for (auto& [name, _] : this->data->scalars) {
+            if (count >= value) break;
+            // display name same as component name for now
+            desc.push_back(MVF::AxisDesc{ name, name, [](float v){ return v; } });
+            ++count;
         }
-        
         this->handler->set_field_info(desc);
         this->handler->queue_render();
     });
@@ -134,13 +138,10 @@ void AttributePanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     for (size_t i = max_dim; i > 0; i--) {
         dim_menu.remove_text(i);
     }
-
     max_dim = std::min(this->data->scalars.size(), (size_t)2);
-    
     for (size_t i = 1; i <= max_dim; i++) {
         dim_menu.append(std::to_string(i));
     }
-
     handler->make_current();
     static_cast<MVF::AttribRenderer*>(handler->renderer)->set_field_data(this->data);
     handler->queue_render();

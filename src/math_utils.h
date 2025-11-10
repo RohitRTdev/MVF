@@ -29,6 +29,8 @@ struct Vector2f {
     Vector2f operator-(const Vector2f& r) const;
     Vector2f operator*(float f) const;
     Vector2f& normalize();
+    // Compatibility alias (upper-case like some client code)
+    inline Vector2f& Normalize() { return normalize(); }
 };
 
 struct Vector3f {
@@ -52,6 +54,9 @@ struct Vector3f {
     float dist(const Vector3f& other);
     float length();
     void print() const;
+    // Compatibility aliases (upper-case like some client code)
+    inline Vector3f Cross(const Vector3f& v) const { return cross(v); }
+    inline Vector3f& Normalize() { return normalize(); }
 };
 
 struct Vector4f {
@@ -110,5 +115,30 @@ struct Matrix4f {
     void init_pers_proj_transform(const PersProjInfo& p);
     void init_ortho_proj_transform(const OrthoProjInfo& p); 
     Vector3f dir_transform(const Vector3f& v) const; 
+    // Compatibility alias (upper-case like some client code)
+    inline void SetZero() { set_zero(); }
 };
+
+// Simple quaternion for trackball rotations
+struct Quaternion {
+    float w, x, y, z;
+    Quaternion() : w(1.0f), x(0.0f), y(0.0f), z(0.0f) {}
+    Quaternion(float _w, float _x, float _y, float _z) : w(_w), x(_x), y(_y), z(_z) {}
+
+    static Quaternion FromAxisAngle(const Vector3f& axis, float angle);
+    void Normalize();
+
+    // Hamilton product
+    Quaternion operator*(const Quaternion& r) const {
+        return Quaternion(
+            w*r.w - x*r.x - y*r.y - z*r.z,
+            w*r.x + x*r.w + y*r.z - z*r.y,
+            w*r.y - x*r.z + y*r.w + z*r.x,
+            w*r.z + x*r.y - y*r.x + z*r.w
+        );
+    }
+};
+
+// Convert quaternion to a rotation matrix (column-major consistent with Matrix4f usage)
+Matrix4f QuaternionToMatrix(const Quaternion& q);
 #pragma pack(pop)

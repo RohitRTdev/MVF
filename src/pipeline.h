@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <GL/glew.h>
 
 namespace MVF {
@@ -8,6 +9,8 @@ namespace MVF {
         // Spatial domain
         VEC_GLYPH = 0,
         BOX,
+        SLICE,
+        DVR,
 
         // Attribute domain
         AXIS = 0,
@@ -43,6 +46,22 @@ namespace MVF {
         GLuint uMVP, uColor;
         
         BoxPipeline();    
+    };
+
+    struct SlicePipeline : Pipeline {
+        GLuint uMVP;
+        GLuint uTex;
+        SlicePipeline();
+    };
+
+    struct DvrPipeline : Pipeline {
+        GLuint uMVP;
+        GLuint uTex3D;
+        GLuint uBBoxMin;
+        GLuint uBBoxMax;
+        GLuint uSlices;
+        GLuint uAlphaScale;
+        DvrPipeline();
     };
     
     struct AxisPipeline : Pipeline {

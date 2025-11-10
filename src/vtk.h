@@ -18,9 +18,7 @@ namespace MVF {
         Vector3f origin;
         Vector3f spacing;
         std::unordered_map<std::string, std::tuple<std::vector<float>, int>> scalars;
-#ifdef MVF_DEBUG
-        ~VolumeData();
-#endif
+        ~VolumeData(); // always declare; debug print guarded in cpp
     };
 
     struct LoadProxy {
@@ -42,9 +40,7 @@ namespace MVF {
         void cancel_io();
         void complete();
         void reset();
-#ifdef MVF_DEBUG 
-        ~LoadProxy();
-#endif
+        ~LoadProxy(); // always declare; debug print guarded in cpp
     };
 
     bool read_file(const std::string& filename, std::string& out);

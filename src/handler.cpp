@@ -1,6 +1,7 @@
 #include <chrono>
 #include <format>
 #include <GL/glew.h>
+#include <algorithm> // for std::clamp
 #include "error.h"
 #include "handler.h"
 #include "ui.h"
@@ -32,7 +33,7 @@ namespace MVF {
         signal_realize().connect(sigc::mem_fun(*this, &RenderHandler::on_realize));
         signal_unrealize().connect(sigc::mem_fun(*this, &RenderHandler::on_unrealize));
         signal_render().connect(sigc::mem_fun(*this, &RenderHandler::on_render), true);
-        signal_resize().connect(sigc::mem_fun(*this, &RenderHandler::on_resize)); 
+        signal_resize().connect(sigc::mem_fun(*this, &RenderHandler::on_resize));
     }
 
     void RenderHandler::on_resize(int width, int height) {
@@ -52,23 +53,24 @@ namespace MVF {
 
                 initialized_glew = true;
             }
-            
+
             std::cout << "Realizing GLArea..." << std::endl;
-            renderer->init(get_allocated_width(), get_allocated_height()); 
+            renderer->init(get_allocated_width(), get_allocated_height());
             // This is needed since gtk might realize and unrealize the context multiple times
             // We need to then recreate the buffers
             renderer->resync();
-        } catch (const Gdk::GLError& gle) {
+        }
+        catch (const Gdk::GLError& gle) {
             MVF::app_error(std::string("Failed to realize GLArea ") + gle.what());
         }
     }
-    
+
     void RenderHandler::on_unrealize() {
 #ifdef MVF_DEBUG
         std::cout << "Unrealizing GL context..." << std::endl;
 #endif
         Gtk::GLArea::on_unrealize();
-        
+
         renderer->unload();
     }
 
@@ -76,9 +78,79 @@ namespace MVF {
         renderer->render();
         return true;
     }
-        
+
     SpatialHandler::SpatialHandler(SpatialRenderer* renderer) : RenderHandler(renderer)
-    {}
+    {
+        // Add GTK4 controllers for mouse
+        auto click = Gtk::GestureClick::create();
+        click->set_button(GDK_BUTTON_PRIMARY);
+        click->signal_pressed().connect([this](int n_press, double x, double y) {
+            auto spatial = static_cast<SpatialRenderer*>(this->renderer);
+            // If slice mode active, update slice position on click but still allow rotation drag
+            if (spatial->entity.get_mode() == EntityMode::SCALAR_SLICE) {
+                float t = 1.0f - static_cast<float>(y) / static_cast<float>(get_allocated_height());
+                t = std::clamp(t, 0.0f, 1.0f);
+                spatial->entity.set_slice_position(t);
+                queue_render();
+            }
+            // Always enable trackball on press
+            trackball_active = true;
+            last_x = static_cast<int>(x);
+            last_y = static_cast<int>(y);
+            });
+        click->signal_released().connect([this](int n_press, double x, double y) {
+            trackball_active = false;
+            });
+        add_controller(click);
+
+        auto motion = Gtk::EventControllerMotion::create();
+        motion->signal_motion().connect([this](double x, double y) {
+            auto spatial = static_cast<SpatialRenderer*>(this->renderer);
+            // If slice mode active, update slice position continuously BUT continue to rotate as well
+            if (spatial->entity.get_mode() == EntityMode::SCALAR_SLICE) {
+                float t = 1.0f - static_cast<float>(y) / static_cast<float>(get_allocated_height());
+                t = std::clamp(t, 0.0f, 1.0f);
+                spatial->entity.set_slice_position(t);
+                // do not return; allow trackball below
+            }
+            if (!trackball_active) return;
+            // Trackball update
+            int w = get_allocated_width();
+            int h = get_allocated_height();
+            auto map = [](int px, int py, int w, int h) {
+                float nx = (2.0f * px - w) / (float)w;
+                float ny = (h - 2.0f * py) / (float)h;
+                float len2 = nx * nx + ny * ny;
+                float nz = 0.0f;
+                if (len2 <= 1.0f) nz = sqrtf(1.0f - len2);
+                else {
+                    float norm = 1.0f / sqrtf(len2);
+                    nx *= norm; ny *= norm;
+                }
+                return Vector3f(nx, ny, nz);
+                };
+            Vector3f va = map(last_x, last_y, w, h);
+            Vector3f vb = map((int)x, (int)y, w, h);
+            Vector3f axis = va.cross(vb);
+            float dot = va.x * vb.x + va.y * vb.y + va.z * vb.z;
+            if (dot > 1.0f) dot = 1.0f;
+            if (dot < -1.0f) dot = -1.0f;
+            float angle = acosf(dot);
+            if (axis.length() > 1e-5f && angle > 1e-5f) {
+                axis.Normalize();
+                Quaternion dq = Quaternion::FromAxisAngle(axis, angle);
+                trackball_quat = dq * trackball_quat;
+                trackball_quat.Normalize();
+                // Apply to entity's world as a rotation matrix pre-multiplied
+                Matrix4f R = QuaternionToMatrix(trackball_quat);
+                spatial->set_world_orientation(R); // keep only trackball orientation
+            }
+            last_x = static_cast<int>(x);
+            last_y = static_cast<int>(y);
+            queue_render();
+            });
+        add_controller(motion);
+    }
 
     AttribHandler::AttribHandler(AttribRenderer* renderer) : RenderHandler(renderer), mouse_overlay(*this) {
         auto mouse_click = Gtk::GestureClick::create();
@@ -86,9 +158,9 @@ namespace MVF {
         mouse_click->signal_pressed().connect(sigc::mem_fun(*this, &AttribHandler::on_mouse_click));
         add_controller(mouse_click);
         auto motion = Gtk::EventControllerMotion::create();
-        motion->signal_motion().connect([this] (double x, double y) {
+        motion->signal_motion().connect([this](double x, double y) {
             auto [x_ndc, y_ndc] = convert_to_ndc(x, y, get_allocated_width(), get_allocated_height());
-            
+
             if (num_dimensions == 0 || std::abs(y_ndc) > DETECT_THRESHOLD || std::abs(x_ndc) > AXIS_LENGTH / 2) {
                 this->mouse_overlay.hide_now();
                 return;
@@ -96,14 +168,14 @@ namespace MVF {
 
             auto [x_f, _] = static_cast<AttribRenderer*>(this->renderer)->get_field_point(x_ndc, y_ndc, 0);
             this->mouse_overlay.show_at(static_cast<int>(x), static_cast<int>(y), std::format("U={:.2f}", x_f));
-        });
+            });
         add_controller(motion);
-    
+
         signal_unrealize().connect([this] {
             mouse_overlay.unparent();
-        });
+            });
     }
-        
+
     void AttribHandler::set_field_info(std::vector<AxisDesc>& descriptors) {
         num_dimensions = descriptors.size();
         static_cast<AttribRenderer*>(renderer)->set_attrib_space_axis(descriptors);
@@ -116,48 +188,82 @@ namespace MVF {
 
         auto spatial_renderer = static_cast<SpatialRenderer*>(renderer);
 
-        switch(keyval) { 
-            case GDK_KEY_w: {
-                spatial_renderer->entity.rotate(ROTATION_FACTOR, 0, 0);
-                break;
-            }
-            case GDK_KEY_s: {
-                spatial_renderer->entity.rotate(-ROTATION_FACTOR, 0, 0);
-                break;
+        switch (keyval) {
+        case GDK_KEY_w: {
+            spatial_renderer->entity.rotate(ROTATION_FACTOR, 0, 0);
+            break;
+        }
+        case GDK_KEY_s: {
+            spatial_renderer->entity.rotate(-ROTATION_FACTOR, 0, 0);
+            break;
 
-            }
-            case GDK_KEY_a: {
-                spatial_renderer->entity.rotate(0, 0, ROTATION_FACTOR);
-                break;
-            }
-            case GDK_KEY_d: {
-                spatial_renderer->entity.rotate(0, 0, -ROTATION_FACTOR);
-                break;
-            }
-            case GDK_KEY_q: {
-                spatial_renderer->entity.rotate(0, ROTATION_FACTOR, 0);
-                break;
-            }
-            case GDK_KEY_e: {
-                spatial_renderer->entity.rotate(0, -ROTATION_FACTOR, 0);
-                break;
-            }
-            case GDK_KEY_z: {
-                current_zoom += ZOOM_FACTOR;
-                spatial_renderer->entity.scale(current_zoom);
-                break;
-            }
-            case GDK_KEY_x: {
-                current_zoom -= ZOOM_FACTOR;
-                spatial_renderer->entity.scale(current_zoom);
-                break;
-            }
-            default: return false;
+        }
+        case GDK_KEY_a: {
+            spatial_renderer->entity.rotate(0, 0, ROTATION_FACTOR);
+            break;
+        }
+        case GDK_KEY_d: {
+            spatial_renderer->entity.rotate(0, 0, -ROTATION_FACTOR);
+            break;
+        }
+        case GDK_KEY_q: {
+            spatial_renderer->entity.rotate(0, ROTATION_FACTOR, 0);
+            break;
+        }
+        case GDK_KEY_e: {
+            spatial_renderer->entity.rotate(0, -ROTATION_FACTOR, 0);
+            break;
+        }
+        case GDK_KEY_z: {
+            current_zoom += ZOOM_FACTOR;
+            spatial_renderer->entity.scale(current_zoom);
+            break;
+        }
+        case GDK_KEY_x: {
+            current_zoom -= ZOOM_FACTOR;
+            spatial_renderer->entity.scale(current_zoom);
+            break;
+        }
+        case GDK_KEY_Up: {
+            if (spatial_renderer->entity.get_mode() == EntityMode::SCALAR_SLICE) {
+                float t = spatial_renderer->entity.get_slice_position();
+                spatial_renderer->entity.set_slice_position(std::min(1.0f, t + 0.01f));
+            } else return false;
+            break;
+        }
+        case GDK_KEY_Down: {
+            if (spatial_renderer->entity.get_mode() == EntityMode::SCALAR_SLICE) {
+                float t = spatial_renderer->entity.get_slice_position();
+                spatial_renderer->entity.set_slice_position(std::max(0.0f, t - 0.01f));
+            } else return false;
+            break;
+        }
+        case GDK_KEY_Left: {
+            if (spatial_renderer->entity.get_mode() == EntityMode::SCALAR_SLICE) {
+                int axis = spatial_renderer->entity.get_slice_axis();
+                if (axis >= 0) {
+                    axis = (axis + 2) % 3; // cycle backwards
+                    spatial_renderer->entity.set_slice_axis(axis);
+                }
+            } else return false;
+            break;
+        }
+        case GDK_KEY_Right: {
+            if (spatial_renderer->entity.get_mode() == EntityMode::SCALAR_SLICE) {
+                int axis = spatial_renderer->entity.get_slice_axis();
+                if (axis >= 0) {
+                    axis = (axis + 1) % 3; // cycle forward
+                    spatial_renderer->entity.set_slice_axis(axis);
+                }
+            } else return false;
+            break;
+        }
+        default: return false;
         }
 
         queue_render();
         return true;
-    } 
+    }
 
     void AttribHandler::on_mouse_click(int n_press, double x, double y) {
         auto width = get_allocated_width();

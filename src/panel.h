@@ -1,6 +1,7 @@
 #pragma once
 
 #include <gtkmm.h>
+#include <memory>
 #include "handler.h"
 #include "vtk.h"
 
@@ -17,7 +18,9 @@ public:
 private:
     enum class Selection {
         NONE,
-        VOLUME
+        VOLUME,
+        SLICE,
+        DVR
     };
 
     MVF::SpatialHandler* handler;

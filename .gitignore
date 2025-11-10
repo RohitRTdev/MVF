@@ -1,7 +1,17 @@
+# Binary and build files
 *.exe
 *.o
 *.a
 *.d
 build/*
+
+# IDE and workspace settings
 .vscode/*
+.vs/
+
+# Data
 dataset/*
+
+# OS-specific junk
+.DS_Store
+Thumbs.db
