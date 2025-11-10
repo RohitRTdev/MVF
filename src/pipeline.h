@@ -9,7 +9,9 @@ namespace MVF {
         VEC_GLYPH = 0,
         BOX,
         ISO,
-        
+        SLICE,
+        DVR,
+
         // Attribute domain
         AXIS = 0,
         MARKER
@@ -44,6 +46,22 @@ namespace MVF {
         GLuint uMVP, uColor;
         
         BoxPipeline();    
+    };
+
+    struct SlicePipeline : Pipeline {
+        GLuint uMVP;
+        GLuint uTex;
+        SlicePipeline();
+    };
+
+    struct DvrPipeline : Pipeline {
+        GLuint uMVP;
+        GLuint uTex3D;
+        GLuint uBBoxMin;
+        GLuint uBBoxMax;
+        GLuint uSlices;
+        GLuint uAlphaScale;
+        DvrPipeline();
     };
     
     struct AxisPipeline : Pipeline {

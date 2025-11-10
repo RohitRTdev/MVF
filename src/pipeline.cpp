@@ -114,6 +114,20 @@ namespace MVF{
         uMVP = get_uniform_var("uMVP");
         uColor = get_uniform_var("uColor");
     }  
+
+    SlicePipeline::SlicePipeline() : Pipeline("shaders/slice.vs", "shaders/slice.fs", PipelineType::SLICE) {
+        uMVP = get_uniform_var("uMVP");
+        uTex = get_uniform_var("uTex");
+    }
+
+    DvrPipeline::DvrPipeline() : Pipeline("shaders/dvr.vs", "shaders/dvr.fs", PipelineType::DVR) {
+        uMVP = get_uniform_var("uMVP");
+        uTex3D = get_uniform_var("uTex3D");
+        uBBoxMin = get_uniform_var("uBBoxMin");
+        uBBoxMax = get_uniform_var("uBBoxMax");
+        uSlices = get_uniform_var("uSlices");
+        uAlphaScale = get_uniform_var("uAlphaScale");
+    }
         
     AxisPipeline::AxisPipeline() : Pipeline("shaders/axis.vs", "shaders/solid_color.fs", PipelineType::AXIS) {
         uColor = get_uniform_var("uColor");
@@ -140,8 +154,8 @@ namespace MVF{
     std::vector<Pipeline*> Pipeline::init_pipelines(bool is_spatial_pipeline) {
         std::vector<Pipeline*> pipelines;
         if (is_spatial_pipeline) {
-            // *This must follow the same order as of the PipelineType enum class*
-            pipelines = {new VecGlyphPipeline(), new BoxPipeline(), new IsoPipeline()};
+            // *Order must match PipelineType enum ordering for spatial domain*
+            pipelines = {new VecGlyphPipeline(), new BoxPipeline(), new IsoPipeline(), new SlicePipeline(), new DvrPipeline()};
 #ifdef MVF_DEBUG
         std::cout << "Created spatial pipeline of size: " << pipelines.size() << std::endl;
 #endif

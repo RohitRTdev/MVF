@@ -1,9 +1,20 @@
+# Binary and build files
 *.exe
 *.o
 *.a
 *.d
 build/*
-.vscode/*
-dataset/*
 Makefile
 mvf
+
+# IDE and workspace settings
+.vscode/*
+dataset/*
+.vs/
+
+# Data
+dataset/*
+
+# OS-specific junk
+.DS_Store
+Thumbs.db

@@ -39,6 +39,20 @@ namespace MVF {
             glDeleteBuffers(1, &vec_buffer.vbo_glyph);
         }
 
+        if (slice_buffer.is_active) {
+            glDeleteTextures(1, &slice_buffer.tex_slice);
+            glDeleteBuffers(1, &slice_buffer.vbo_slice);
+            glDeleteVertexArrays(1, &slice_buffer.vao_slice);
+            slice_buffer = {};
+        }
+
+        if (dvr_buffer.is_active) {
+            glDeleteTextures(1, &dvr_buffer.tex3d);
+            glDeleteBuffers(1, &dvr_buffer.vbo);
+            glDeleteVertexArrays(1, &dvr_buffer.vao);
+            dvr_buffer = {};
+        }
+
         vec_buffer.is_active = false;
         box_buffer.is_active = false;
 
@@ -61,6 +75,46 @@ namespace MVF {
         type.data = VectorGlyphDesc{field1, field2, field3};
 
         create_buffers();
+    }
+
+    void VolumeEntity::set_scalar_slice(const std::string& field, int axis) {
+        type.mode = EntityMode::SCALAR_SLICE;
+        type.data = ScalarSliceDesc{field, axis};
+        update_slice_resources();
+    }
+
+    void VolumeEntity::set_dvr(const std::string& field) {
+        type.mode = EntityMode::DVR;
+        type.data = DVRDesc{field};
+        update_dvr_resources();
+    }
+
+    void VolumeEntity::set_slice_position(float t) {
+        slice_t = std::min(1.0f, std::max(0.0f, t));
+        if (type.mode == EntityMode::SCALAR_SLICE) {
+            update_slice_resources();
+        }
+    }
+
+    // New helpers
+    void VolumeEntity::set_slice_axis(int axis) {
+        if (type.mode != EntityMode::SCALAR_SLICE) return;
+        auto& desc = std::get<ScalarSliceDesc>(type.data);
+        axis = std::max(0, std::min(2, axis));
+        if (desc.axis != axis) {
+            desc.axis = axis;
+            update_slice_resources();
+        }
+    }
+
+    int VolumeEntity::get_slice_axis() const {
+        if (type.mode != EntityMode::SCALAR_SLICE) return -1;
+        const auto& desc = std::get<ScalarSliceDesc>(type.data);
+        return desc.axis;
+    }
+
+    float VolumeEntity::get_slice_position() const {
+        return slice_t;
     }
 
     void VolumeEntity::create_vertex_array() {
@@ -164,6 +218,156 @@ namespace MVF {
         }
     } 
 
+    // Revised: pass full ranges to generate correct slice plane geometry
+    static void make_slice_quad(float xmin, float xmax,
+                                float ymin, float ymax,
+                                float zmin, float zmax,
+                                float p, int axis,
+                                std::array<float, 20>& out) {
+        if (axis == 2) { // Z constant, vary X,Y
+            float v[20] = {
+                xmin, ymin, p, 0.0f, 0.0f,
+                xmax, ymin, p, 1.0f, 0.0f,
+                xmin, ymax, p, 0.0f, 1.0f,
+                xmax, ymax, p, 1.0f, 1.0f
+            };
+            std::copy(v, v+20, out.begin());
+        } else if (axis == 1) { // Y constant, vary X,Z
+            float v[20] = {
+                xmin, p, zmin, 0.0f, 0.0f,
+                xmax, p, zmin, 1.0f, 0.0f,
+                xmin, p, zmax, 0.0f, 1.0f,
+                xmax, p, zmax, 1.0f, 1.0f
+            };
+            std::copy(v, v+20, out.begin());
+        } else { // axis == 0, X constant, vary Y,Z
+            float v[20] = {
+                p, ymin, zmin, 0.0f, 0.0f,
+                p, ymin, zmax, 1.0f, 0.0f,
+                p, ymax, zmin, 0.0f, 1.0f,
+                p, ymax, zmax, 1.0f, 1.0f
+            };
+            std::copy(v, v+20, out.begin());
+        }
+    }
+
+    void VolumeEntity::update_slice_resources() {
+        auto& desc = std::get<ScalarSliceDesc>(type.data);
+        if (!slice_buffer.is_active) {
+            glGenVertexArrays(1, &slice_buffer.vao_slice);
+            glBindVertexArray(slice_buffer.vao_slice);
+            glGenBuffers(1, &slice_buffer.vbo_slice);
+            glBindBuffer(GL_ARRAY_BUFFER, slice_buffer.vbo_slice);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), 0);
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+            glBindVertexArray(0);
+            slice_buffer.is_active = true;
+        }
+
+        // Update plane vertices based on slice_t
+        float xmin = model->origin.x, ymin = model->origin.y, zmin = model->origin.z;
+        float xmax = model->nx * model->spacing.x + model->origin.x; 
+        float ymax = model->ny * model->spacing.y + model->origin.y; 
+        float zmax = model->nz * model->spacing.z + model->origin.z; 
+        float p = 0;
+        if (desc.axis == 2) {
+            p = zmin + (zmax - zmin) * slice_t; // Z const
+        } else if (desc.axis == 1) {
+            p = ymin + (ymax - ymin) * slice_t; // Y const
+        } else {
+            p = xmin + (xmax - xmin) * slice_t; // X const
+        }
+        std::array<float, 20> verts;
+        make_slice_quad(xmin, xmax, ymin, ymax, zmin, zmax, p, desc.axis, verts);
+        glBindBuffer(GL_ARRAY_BUFFER, slice_buffer.vbo_slice);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(float)*verts.size(), verts.data(), GL_DYNAMIC_DRAW);
+
+        // Upload scalar values as a R8 texture normalized 0..1
+        auto it = model->scalars.find(desc.field);
+        if (it == model->scalars.end()) return;
+        auto& vec = std::get<0>(it->second);
+        auto comps = std::get<1>(it->second);
+        // Determine slice dimensions
+        int w=0,h=0; int nx=model->nx, ny=model->ny, nz=model->nz;
+        if (desc.axis == 2) { w = nx; h = ny; }
+        else if (desc.axis == 1) { w = nx; h = nz; }
+        else { w = ny; h = nz; }
+        slice_buffer.tex_w = w; slice_buffer.tex_h = h;
+        std::vector<uint8_t> tex(w*h);
+        // Compute min/max of magnitude (or scalar) across whole volume
+        float minv = std::numeric_limits<float>::max(), maxv = -std::numeric_limits<float>::max();
+        if (comps > 1) {
+            for (size_t i=0;i<vec.size(); i+=comps) {
+                float mag=0.0f; for(int c=0;c<comps;++c){ float v=vec[i+c]; mag += v*v; } mag = std::sqrt(mag);
+                minv = std::min(minv, mag); maxv = std::max(maxv, mag);
+            }
+        } else {
+            for (size_t i=0;i<vec.size(); i+=1) {
+                float v = vec[i]; minv = std::min(minv, v); maxv = std::max(maxv, v);
+            }
+        }
+        float denom = (maxv-minv) > 0 ? (maxv-minv) : 1.0f;
+        int k = int(slice_t * ((desc.axis==2? nz: desc.axis==1? ny: nx)-1));
+        for (int j=0;j<h;++j) {
+            for (int i=0;i<w;++i) {
+                int idx;
+                if (desc.axis == 2) idx = (k*ny + j)*nx + i; // z slice
+                else if (desc.axis == 1) idx = (j*ny + k)*nx + i; // y slice
+                else idx = (j*ny + i)*nx + k; // x slice
+                float sample;
+                if (comps > 1) {
+                    float mag=0.0f; int base = idx*comps; for(int c=0;c<comps;++c){ float v=vec[base+c]; mag += v*v; } sample = std::sqrt(mag);
+                } else sample = vec[idx];
+                tex[j*w + i] = (uint8_t)(255.0f * (sample - minv) / denom);
+            }
+        }
+        if (slice_buffer.tex_slice == 0) glGenTextures(1, &slice_buffer.tex_slice);
+        glBindTexture(GL_TEXTURE_2D, slice_buffer.tex_slice);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, tex.data());
+    }
+
+    void VolumeEntity::update_dvr_resources() {
+        auto& desc = std::get<DVRDesc>(type.data);
+        if (!dvr_buffer.is_active) {
+            glGenVertexArrays(1, &dvr_buffer.vao);
+            glBindVertexArray(dvr_buffer.vao);
+            glGenBuffers(1, &dvr_buffer.vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, dvr_buffer.vbo);
+            float quad[12] = {-1.f,-1.f,0.f, 1.f,-1.f,0.f, -1.f,1.f,0.f, 1.f,1.f,0.f};
+            glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),0);
+            glBindVertexArray(0);
+            dvr_buffer.is_active = true;
+        }
+        auto it = model->scalars.find(desc.field); if (it==model->scalars.end()) return;
+        auto& vec = std::get<0>(it->second); auto comps = std::get<1>(it->second);
+        int nx=model->nx, ny=model->ny, nz=model->nz; dvr_buffer.nx=nx; dvr_buffer.ny=ny; dvr_buffer.nz=nz;
+        std::vector<uint8_t> vol(nx*ny*nz);
+        float minv=std::numeric_limits<float>::max(), maxv=-std::numeric_limits<float>::max();
+        if(comps>1){
+            for(size_t i=0;i<vec.size(); i+=comps){ float mag=0.f; for(int c=0;c<comps;++c){ float v=vec[i+c]; mag+=v*v;} mag=std::sqrt(mag); minv=std::min(minv,mag); maxv=std::max(maxv,mag);} }
+        else { for(size_t i=0;i<vec.size(); ++i){ float v=vec[i]; minv=std::min(minv,v); maxv=std::max(maxv,v);} }
+        float denom=(maxv-minv)>0?(maxv-minv):1.f;
+        for(int z=0; z<nz; ++z){ for(int y=0; y<ny; ++y){ for(int x=0; x<nx; ++x){ int idx=(z*ny + y)*nx + x; float sample; if(comps>1){ int base=idx*comps; float mag=0.f; for(int c=0;c<comps;++c){ float v=vec[base+c]; mag+=v*v;} sample=std::sqrt(mag);} else sample=vec[idx]; vol[idx]=(uint8_t)(255.f*(sample-minv)/denom); } } }
+        if(dvr_buffer.tex3d==0) glGenTextures(1,&dvr_buffer.tex3d);
+        glBindTexture(GL_TEXTURE_3D,dvr_buffer.tex3d);
+        glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_R,GL_CLAMP_TO_EDGE);
+        glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+        glTexImage3D(GL_TEXTURE_3D,0,GL_R8,nx,ny,nz,0,GL_RED,GL_UNSIGNED_BYTE,vol.data());
+    }
+
     void VolumeEntity::draw() {
 		auto pipeline_box = reinterpret_cast<BoxPipeline*>(pipelines[static_cast<int>(PipelineType::BOX)]);
 		auto pipeline_vec = reinterpret_cast<VecGlyphPipeline*>(pipelines[static_cast<int>(PipelineType::VEC_GLYPH)]);
@@ -176,6 +380,24 @@ namespace MVF {
             glUseProgram(pipeline_vec->shader_program);
             glBindVertexArray(arrow_buffer.vao_vec_glyph);
             glDrawElementsInstanced(GL_TRIANGLES, arrow_mesh.indices.size(), GL_UNSIGNED_INT, 0, field_mesh.points.size());
+            glBindVertexArray(0);
+        }
+        else if (type.mode == EntityMode::SCALAR_SLICE) {
+            auto pipeline = reinterpret_cast<SlicePipeline*>(pipelines[static_cast<int>(PipelineType::BOX)+1]);
+            glUseProgram(pipeline->shader_program);
+            glBindVertexArray(slice_buffer.vao_slice);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, slice_buffer.tex_slice);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            glBindVertexArray(0);
+        }
+        else if (type.mode == EntityMode::DVR) {
+            auto pipeline = reinterpret_cast<DvrPipeline*>(pipelines[static_cast<int>(PipelineType::DVR)]);
+            glUseProgram(pipeline->shader_program);
+            glBindVertexArray(dvr_buffer.vao);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_3D, dvr_buffer.tex3d);
+            glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, dvr_buffer.num_slices);
             glBindVertexArray(0);
         }
     }

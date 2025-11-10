@@ -19,7 +19,7 @@ Vector2f Vector2f::operator*(float f) const {
 
 Vector2f& Vector2f::normalize() {
     float Length = sqrtf(x * x + y * y);
-    x /= Length; y /= Length;
+    if (Length > 0.0f) { x /= Length; y /= Length; }
     return *this;
 }
 
@@ -74,7 +74,7 @@ Vector3f Vector3f::cross(const Vector3f& v) const {
 
 Vector3f& Vector3f::normalize() {
     float Length = sqrtf(x * x + y * y + z * z);
-    x /= Length; y /= Length; z /= Length;
+    if (Length > 0.0f) { x /= Length; y /= Length; z /= Length; }
     return *this;
 }
 
@@ -426,4 +426,44 @@ void Matrix4f::init_ortho_proj_transform(const OrthoProjInfo& p) {
     m[0][3] = -(p.right + p.left) / (p.right - p.left);
     m[1][3] = -(p.top + p.bottom) / (p.top - p.bottom);
     m[2][3] = -(p.zFar + p.zNear) / (p.zFar - p.zNear);
+}
+
+// --- Quaternion helpers ---
+
+Quaternion Quaternion::FromAxisAngle(const Vector3f& axis, float angle) {
+    float half = angle * 0.5f;
+    float s = sinf(half);
+    Vector3f n = axis; n.normalize();
+    return Quaternion(cosf(half), n.x * s, n.y * s, n.z * s);
+}
+
+void Quaternion::Normalize() {
+    float len = sqrtf(w*w + x*x + y*y + z*z);
+    if (len > 0.0f) { w /= len; x /= len; y /= len; z /= len; }
+}
+
+Matrix4f QuaternionToMatrix(const Quaternion& qin) {
+    Quaternion q = qin;
+    // ensure normalized
+    float len = sqrtf(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
+    if (len > 0.0f) { q.w/=len; q.x/=len; q.y/=len; q.z/=len; }
+
+    float xx = q.x*q.x, yy = q.y*q.y, zz = q.z*q.z;
+    float xy = q.x*q.y, xz = q.x*q.z, yz = q.y*q.z;
+    float wx = q.w*q.x, wy = q.w*q.y, wz = q.w*q.z;
+
+    Matrix4f m; m.init_identity();
+    m.m[0][0] = 1.0f - 2.0f*(yy + zz);
+    m.m[0][1] = 2.0f*(xy - wz);
+    m.m[0][2] = 2.0f*(xz + wy);
+
+    m.m[1][0] = 2.0f*(xy + wz);
+    m.m[1][1] = 1.0f - 2.0f*(xx + zz);
+    m.m[1][2] = 2.0f*(yz - wx);
+
+    m.m[2][0] = 2.0f*(xz - wy);
+    m.m[2][1] = 2.0f*(yz + wx);
+    m.m[2][2] = 1.0f - 2.0f*(xx + yy);
+
+    return m;
 }
