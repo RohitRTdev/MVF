@@ -82,3 +82,94 @@ void HoverOverlay::show_at(int x, int y, const std::string& text) {
 void HoverOverlay::hide_now() {
     popdown();
 }
+
+MultiSelectCombo::MultiSelectCombo(const std::vector<std::string>& options, std::function<void()> fn) : 
+Gtk::Box(Gtk::Orientation::VERTICAL), handler(fn) {
+    set_spacing(4);
+
+    main_button.set_label("Select Components ▼");
+    main_button.signal_clicked().connect(sigc::mem_fun(*this, &MultiSelectCombo::on_button_clicked));
+    append(main_button);
+
+    popover.set_has_arrow(false);
+    popover.set_parent(main_button);
+
+    vbox = Gtk::Box(Gtk::Orientation::VERTICAL);
+    vbox.set_margin(8);
+    vbox.set_spacing(4);
+    popover.set_child(vbox);
+    
+    popover.signal_closed().connect([this]() {
+        handler();
+        if (secondary_handler) {
+            secondary_handler();
+        }
+        is_popover_visible = false;
+    });
+    
+    // Add check buttons
+    for (const auto& opt : options) {
+        auto check = Gtk::make_managed<Gtk::CheckButton>(opt);
+        vbox.append(*check);
+        check_buttons.push_back(check);
+    }
+}
+    
+void MultiSelectCombo::set_secondary_handler(std::function<void()> handler) {
+    secondary_handler = handler;
+}
+
+MultiSelectCombo::~MultiSelectCombo() {
+    popover.unparent();
+}
+
+std::vector<std::string> MultiSelectCombo::get_selected() const {
+    std::vector<std::string> selected;
+    for (auto check : check_buttons) {
+        if (check->get_active())
+            selected.push_back(check->get_label());
+    }
+    return selected;
+}
+
+// This function assumes that the order of labels and the order of check buttons here match
+void MultiSelectCombo::set_active_mask(std::vector<std::string>& labels) {
+    size_t label_idx = 0;
+
+    for (auto& check: check_buttons) {
+        if(label_idx < labels.size() && std::string(check->get_label()) == labels[label_idx]) {
+            check->set_active(true);
+            label_idx++;
+        }
+        else {
+            check->set_active(false);
+        }
+    }
+}
+
+void MultiSelectCombo::on_button_clicked() {
+    if (is_popover_visible) {
+        throw std::runtime_error("on_button_clicked() called when popover is visible..");
+    }
+    else {
+        popover.popup();
+    }
+
+    is_popover_visible = !is_popover_visible;
+}
+
+void MultiSelectCombo::update_list(const std::vector<std::string>& options) {
+    // Remove all existing elements
+    for (auto& check_button : check_buttons) {
+        vbox.remove(*check_button);
+    }
+
+    check_buttons.clear();
+
+    // Add the new set of elements
+    for (auto& opt : options) {
+        auto check_button = Gtk::make_managed<Gtk::CheckButton>(opt);
+        vbox.append(*check_button);
+        check_buttons.push_back(check_button);
+    }
+}

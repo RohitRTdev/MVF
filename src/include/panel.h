@@ -4,6 +4,7 @@
 #include "handler.h"
 #include "vtk.h"
 #include "attrib.h"
+#include "widgets.h"
 
 class MainWindow;
 
@@ -41,22 +42,23 @@ public:
 private:
     
     struct PanelState {
-        bool dim_menu_state;
         bool trait_sel_state;
         bool apply_button_state;
     };
 
     MVF::AttribHandler* handler;
-    Gtk::ComboBoxText dim_menu, trait_sel;
+    Gtk::ComboBoxText trait_sel;
+    MultiSelectCombo comp_list;
     Gtk::CheckButton show_attrib;
     Gtk::Button apply_button;
-    size_t max_dim = 0;
-    size_t prev_value = 0;
-    bool handle_changed_value = false;
-
-    PanelState state = {false, false, false};
+    bool handle_changed_selection = false;
+    std::vector<std::string> selected_comps;
+    
+    PanelState state = {false, false};
+    bool is_panel_enabled = false;
 
     void change_state(const PanelState& state);
+    void on_selection();
 };
 
 class FieldPanel : public MVFPanel {

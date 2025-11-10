@@ -41,6 +41,7 @@ namespace MVF {
     public:
         AttribHandler(AttribRenderer* renderer);
         void set_field_info(std::vector<AxisDesc>& descriptors);
+        void clear_field_info();
         friend MainWindow;
         friend AttributePanel;
 

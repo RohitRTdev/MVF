@@ -1,6 +1,7 @@
 #include <ranges>
 #include "panel.h"
 #include "renderer.h"
+#include "error.h"
 
 using namespace Gtk;
 
@@ -85,54 +86,26 @@ void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     handler->queue_render();
 }
 
-AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
+AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler), comp_list({}, [this]() { on_selection(); }) {
     set_label("Attribute panel");
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
 
     show_attrib = CheckButton("Show attribute space");
-
-    auto dim_box = make_managed<Box>();
-    auto dim_label = make_managed<Label>("Dimensions");
+    
     auto trait_box = make_managed<Box>();
     auto trait_label = make_managed<Label>("Trait selection");
     apply_button = Button("Apply");
     apply_button.set_hexpand(false);
     trait_sel.append("Point");
     trait_sel.append("Range");
-    dim_menu.append("0");
-    dim_menu.set_active(0);
     trait_sel.set_active(0);
-    change_state(state);
-    dim_menu.signal_changed().connect([this]() {
-        if (!this->data) {
-            return;
-        }
 
-        size_t value = std::stoi(dim_menu.get_active_text());
-        if (value != prev_value) {
-            handle_changed_value = true;
-        }
-        this->handler->make_current();
-        
-        auto desc = this->data->scalars | std::views::take(value) | std::views::transform([](auto& pair) {
-            auto& [name, _] = pair;
-            return MVF::AxisDesc{
-                .comp_name = name,
-                .derive = [](float val) { return val; }
-            };
-        }) | std::ranges::to<std::vector>();            
-
-        trait_sel.set_sensitive(value > 0);
-
-        this->handler->set_field_info(desc);
-        this->handler->queue_render();
-    });
-    dim_box->set_spacing(5);
-    dim_box->set_margin(5);
+    comp_list.set_sensitive(false);
+    trait_sel.set_sensitive(false);
+    apply_button.set_sensitive(false);
+    
     trait_box->set_spacing(5);
     trait_box->set_margin(5);
-    dim_box->append(*dim_label);
-    dim_box->append(dim_menu);
     trait_box->append(*trait_label);
     trait_box->append(trait_sel);
     
@@ -141,19 +114,46 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler) {
    
     vbox->set_spacing(5);
     vbox->append(show_attrib);
-    vbox->append(*dim_box);
+    vbox->append(comp_list);
     vbox->append(*trait_box);
     vbox->append(apply_button);
     vbox->append(*spacer);
 
     set_child(*vbox);
 }
+
+void AttributePanel::on_selection() {
+    auto comps = comp_list.get_selected();
+
+    // If same as previous, don't do anything
+    if (comps == selected_comps) {
+        return;
+    }
+
+    if (comps.size() > 2) {
+        MVF::app_warn("Please set only 2 or less components");
+        comp_list.set_active_mask(selected_comps);
+        return;
+    }
+
+    selected_comps = comps;
+    auto desc = comps | std::views::transform([] (auto& name) {
+        return MVF::AxisDesc{
+            .comp_name = name,
+            .derive = [](float val) { return val; }
+        };
+    }) | std::ranges::to<std::vector<MVF::AxisDesc>>();
+    
+    change_state({comps.size() > 0, false});
+    handle_changed_selection = true;
+
+    handler->set_field_info(desc);
+    handler->queue_render();
+}
     
 void AttributePanel::disable_panel() {
-    state.dim_menu_state = dim_menu.get_sensitive();
     state.trait_sel_state = trait_sel.get_sensitive();
     state.apply_button_state = apply_button.get_sensitive();
-    dim_menu.set_sensitive(false);
     trait_sel.set_sensitive(false);
     apply_button.set_sensitive(false);
 }
@@ -164,9 +164,11 @@ void AttributePanel::enable_panel() {
 
 void AttributePanel::change_state(const PanelState& state) {
     this->state = state;
-    dim_menu.set_sensitive(state.dim_menu_state);
-    trait_sel.set_sensitive(state.trait_sel_state);
-    apply_button.set_sensitive(state.apply_button_state);
+    
+    if (show_attrib.get_active()) {
+        trait_sel.set_sensitive(state.trait_sel_state);
+        apply_button.set_sensitive(state.apply_button_state);
+    }
 }
     
 void AttributePanel::set_button_active() {
@@ -181,19 +183,19 @@ void AttributePanel::set_button_inactive() {
 
 void AttributePanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     this->data = data;
-    dim_menu.set_active(0);
-    for (size_t i = max_dim; i > 0; i--) {
-        dim_menu.remove_text(i);
-    }
 
-    max_dim = std::min(this->data->scalars.size(), (size_t)2);
-    
-    for (size_t i = 1; i <= max_dim; i++) {
-        dim_menu.append(std::to_string(i));
-    }
+    selected_comps.clear();
+    auto field_comps = this->data->scalars | std::views::transform([] (auto& field) {
+        return field.first;
+    }) | std::ranges::to<std::vector<std::string>>();
 
-    change_state({true, false, false});
+    comp_list.update_list(field_comps);
+   
+    comp_list.set_sensitive(true);
+    change_state({true, false});
+
     static_cast<MVF::AttribRenderer*>(handler->renderer)->set_field_data(this->data);
+    handler->clear_field_info();
     handler->queue_render();
 }
     

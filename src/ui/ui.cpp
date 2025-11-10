@@ -75,6 +75,9 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
                 else {
                     field_panel.clear_traits();
                 }
+
+                attrib_panel.set_button_inactive();
+                trait_handler_pending = false;
             }
         }
     });
@@ -178,8 +181,8 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
         field_panel.set_traits(comp, traits);
     });
 
-    attrib_panel.dim_menu.signal_changed().connect([this] {
-        if (!attrib_panel.handle_changed_value) {
+    attrib_panel.comp_list.set_secondary_handler([this] {
+        if (!attrib_panel.handle_changed_selection) {
             return;
         }
         
@@ -192,9 +195,9 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
         else {
             field_panel.clear_traits();
         }
-        attrib_panel.handle_changed_value = false;
+        attrib_panel.handle_changed_selection = false;
     });
-
+    
     add_controller(mouse_click);
 
     signal_close_request().connect(sigc::mem_fun(*this, &MainWindow::on_window_close), false);

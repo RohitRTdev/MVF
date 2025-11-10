@@ -125,6 +125,10 @@ namespace MVF {
         
         static_cast<AttribRenderer*>(renderer)->set_attrib_space_axis(descriptors);
     }
+    
+    void AttribHandler::clear_field_info() {
+        field_comps.clear();
+    }
 
     bool SpatialHandler::on_key_pressed(guint keyval, guint keycode, Gdk::ModifierType state) {
         if (static_cast<int>(state) != 0) {
