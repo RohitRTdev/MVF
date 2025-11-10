@@ -89,6 +89,7 @@ void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
         rep_menu.append("DVR");
     }
     rep_menu.set_active(0);
+    rep_menu.set_sensitive(true);
 
     auto spatial_renderer = static_cast<MVF::SpatialRenderer*>(handler->renderer);
     handler->make_current();

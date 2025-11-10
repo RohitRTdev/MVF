@@ -36,12 +36,11 @@ namespace MVF {
 
         void render() override;
         void resync() override;
-        void unload() override;
 
         // Allow handlers to set the entity orientation while keeping encapsulation
         void set_world_orientation(const Matrix4f& R);
     
-    private:
+    protected:
         bool is_scene_setup = false;
     };
 

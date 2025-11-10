@@ -8,7 +8,6 @@
 #include "attrib.h"
 
 constexpr float ROTATION_FACTOR = 1.0f;
-float current_zoom = 1.0f;
 constexpr float ZOOM_FACTOR = 0.01f;
 constexpr float DETECT_THRESHOLD = 0.015f;
 
@@ -76,40 +75,26 @@ namespace MVF {
         return true;
     }
 
-    SpatialHandler::SpatialHandler(SpatialRenderer* renderer) : RenderHandler(renderer)
-    {
+    SpatialHandler::SpatialHandler(SpatialRenderer* renderer) : RenderHandler(renderer) {
         // Add GTK4 controllers for mouse
         auto click = Gtk::GestureClick::create();
         click->set_button(GDK_BUTTON_PRIMARY);
         click->signal_pressed().connect([this](int n_press, double x, double y) {
-            auto spatial = static_cast<SpatialRenderer*>(this->renderer);
-            // If slice mode active, update slice position on click but still allow rotation drag
-            if (spatial->entity.get_mode() == EntityMode::SCALAR_SLICE) {
-                float t = 1.0f - static_cast<float>(y) / static_cast<float>(get_allocated_height());
-                t = std::clamp(t, 0.0f, 1.0f);
-                spatial->entity.set_slice_position(t);
-                queue_render();
-            }
             // Always enable trackball on press
             trackball_active = true;
             last_x = static_cast<int>(x);
             last_y = static_cast<int>(y);
-            });
+        });
+        
         click->signal_released().connect([this](int n_press, double x, double y) {
             trackball_active = false;
-            });
+        });
+        
         add_controller(click);
 
         auto motion = Gtk::EventControllerMotion::create();
         motion->signal_motion().connect([this](double x, double y) {
             auto spatial = static_cast<SpatialRenderer*>(this->renderer);
-            // If slice mode active, update slice position continuously BUT continue to rotate as well
-            if (spatial->entity.get_mode() == EntityMode::SCALAR_SLICE) {
-                float t = 1.0f - static_cast<float>(y) / static_cast<float>(get_allocated_height());
-                t = std::clamp(t, 0.0f, 1.0f);
-                spatial->entity.set_slice_position(t);
-                // do not return; allow trackball below
-            }
             if (!trackball_active) return;
             // Trackball update
             int w = get_allocated_width();
@@ -125,7 +110,7 @@ namespace MVF {
                     nx *= norm; ny *= norm;
                 }
                 return Vector3f(nx, ny, nz);
-                };
+            };
             Vector3f va = map(last_x, last_y, w, h);
             Vector3f vb = map((int)x, (int)y, w, h);
             Vector3f axis = va.cross(vb);
@@ -145,7 +130,7 @@ namespace MVF {
             last_x = static_cast<int>(x);
             last_y = static_cast<int>(y);
             queue_render();
-            });
+        });
         add_controller(motion);
     }
 

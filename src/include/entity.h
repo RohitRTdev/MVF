@@ -113,7 +113,7 @@ namespace MVF {
         int get_slice_axis() const;    // query current slice axis or -1 if not in slice mode
         float get_slice_position() const; // current normalized slice position
         void set_dvr(const std::string& field); // new: enable DVR on a scalar field
-        EntityMode get_mode() const { return type.mode; }
+        EntityMode get_mode() const;
         void scale(float factor);
         void reset_transform(); 
         void resync();
@@ -126,7 +126,7 @@ namespace MVF {
         Matrix4f init_transform;
         Matrix4f scale_transform;
         
-        EntityRepresentation type;    
+        EntityRepresentation type = {.mode = EntityMode::NONE};    
         BoundingBox box; 
         ArrowMesh arrow_mesh;
         GlyphMesh field_mesh;
@@ -137,6 +137,11 @@ namespace MVF {
         DVRBufferEntity dvr_buffer;
 
         bool initialized = false;
+        float quad[12] = {
+            -1.f, -1.f, 0.f, 1.f,
+            -1.f, 0.f, -1.f, 1.f,
+            0.f,  1.f,  1.f, 0.f
+        };
 
         std::vector<std::string> fields;
         std::vector<Pipeline*> pipelines;

@@ -169,6 +169,10 @@ namespace MVF {
     void FieldRenderer::render() {
         SpatialRenderer::render();
 
+        if (!is_scene_setup) {
+            return;
+        }
+
         // There are 2 entities here. SpatialRenderer::entity takes care of transforms, camera, lighting, bounding box etc
         // Our entity is responsible for displaying computed distance field
         auto limits = Vector3f(SpatialRenderer::entity.model->nx, SpatialRenderer::entity.model->ny, SpatialRenderer::entity.model->nz);

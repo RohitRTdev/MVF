@@ -10,13 +10,19 @@ namespace MVF {
 
     void VolumeEntity::init(std::vector<Pipeline*>& pipelines) {
         this->pipelines = pipelines;
-        create_vertex_array();
     }
 
     void VolumeEntity::resync() {
         create_vertex_array();
         create_bounding_box_buffers();
         create_buffers();
+
+        if (type.mode == EntityMode::SCALAR_SLICE) {
+            update_slice_resources();
+        }
+        else if (type.mode == EntityMode::DVR) {
+            update_dvr_resources();
+        }
     }
 
     void VolumeEntity::load_model(std::shared_ptr<VolumeData>& data) {
@@ -27,6 +33,10 @@ namespace MVF {
         init_model_space();
         create_bounding_box_buffers();
         type.mode = EntityMode::NONE;
+    }
+        
+    EntityMode VolumeEntity::get_mode() const {
+        return type.mode;
     }
    
     void VolumeEntity::destroy_buffers() {
@@ -80,12 +90,14 @@ namespace MVF {
     void VolumeEntity::set_scalar_slice(const std::string& field, int axis) {
         type.mode = EntityMode::SCALAR_SLICE;
         type.data = ScalarSliceDesc{field, axis};
+        create_buffers();
         update_slice_resources();
     }
 
     void VolumeEntity::set_dvr(const std::string& field) {
         type.mode = EntityMode::DVR;
         type.data = DVRDesc{field};
+        create_buffers();
         update_dvr_resources();
     }
 
@@ -211,11 +223,37 @@ namespace MVF {
             glBindBuffer(GL_ARRAY_BUFFER, 0);
 
             vec_buffer.is_active = true;
-
-    #ifdef MVF_DEBUG
-            std::cout << "Created model buffers..." << std::endl;
-    #endif
         }
+        else if (type.mode == EntityMode::SCALAR_SLICE) {
+            glGenVertexArrays(1, &slice_buffer.vao_slice);
+            glBindVertexArray(slice_buffer.vao_slice);
+            glGenBuffers(1, &slice_buffer.vbo_slice);
+            glBindBuffer(GL_ARRAY_BUFFER, slice_buffer.vbo_slice);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), 0);
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+            glBindVertexArray(0);
+            glGenTextures(1, &slice_buffer.tex_slice);
+            
+            slice_buffer.is_active = true;
+        }
+        else if(type.mode == EntityMode::DVR) {
+            glGenVertexArrays(1, &dvr_buffer.vao);
+            glBindVertexArray(dvr_buffer.vao);
+            glGenBuffers(1, &dvr_buffer.vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, dvr_buffer.vbo);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),0);
+            glBindVertexArray(0);
+            glGenTextures(1,&dvr_buffer.tex3d);
+
+            dvr_buffer.is_active = true;
+        }
+#ifdef MVF_DEBUG
+        std::cout << "Created model buffers..." << std::endl;
+#endif
     } 
 
     // Revised: pass full ranges to generate correct slice plane geometry
@@ -253,19 +291,7 @@ namespace MVF {
 
     void VolumeEntity::update_slice_resources() {
         auto& desc = std::get<ScalarSliceDesc>(type.data);
-        if (!slice_buffer.is_active) {
-            glGenVertexArrays(1, &slice_buffer.vao_slice);
-            glBindVertexArray(slice_buffer.vao_slice);
-            glGenBuffers(1, &slice_buffer.vbo_slice);
-            glBindBuffer(GL_ARRAY_BUFFER, slice_buffer.vbo_slice);
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), 0);
-            glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-            glBindVertexArray(0);
-            slice_buffer.is_active = true;
-        }
-
+        
         // Update plane vertices based on slice_t
         float xmin = model->origin.x, ymin = model->origin.y, zmin = model->origin.z;
         float xmax = model->nx * model->spacing.x + model->origin.x; 
@@ -288,7 +314,6 @@ namespace MVF {
         auto it = model->scalars.find(desc.field);
         if (it == model->scalars.end()) return;
         auto& vec = std::get<0>(it->second);
-        auto comps = std::get<1>(it->second);
         // Determine slice dimensions
         int w=0,h=0; int nx=model->nx, ny=model->ny, nz=model->nz;
         if (desc.axis == 2) { w = nx; h = ny; }
@@ -298,15 +323,8 @@ namespace MVF {
         std::vector<uint8_t> tex(w*h);
         // Compute min/max of magnitude (or scalar) across whole volume
         float minv = std::numeric_limits<float>::max(), maxv = -std::numeric_limits<float>::max();
-        if (comps > 1) {
-            for (size_t i=0;i<vec.size(); i+=comps) {
-                float mag=0.0f; for(int c=0;c<comps;++c){ float v=vec[i+c]; mag += v*v; } mag = std::sqrt(mag);
-                minv = std::min(minv, mag); maxv = std::max(maxv, mag);
-            }
-        } else {
-            for (size_t i=0;i<vec.size(); i+=1) {
-                float v = vec[i]; minv = std::min(minv, v); maxv = std::max(maxv, v);
-            }
+        for (size_t i=0;i<vec.size(); i+=1) {
+            float v = vec[i]; minv = std::min(minv, v); maxv = std::max(maxv, v);
         }
         float denom = (maxv-minv) > 0 ? (maxv-minv) : 1.0f;
         int k = int(slice_t * ((desc.axis==2? nz: desc.axis==1? ny: nx)-1));
@@ -317,13 +335,10 @@ namespace MVF {
                 else if (desc.axis == 1) idx = (j*ny + k)*nx + i; // y slice
                 else idx = (j*ny + i)*nx + k; // x slice
                 float sample;
-                if (comps > 1) {
-                    float mag=0.0f; int base = idx*comps; for(int c=0;c<comps;++c){ float v=vec[base+c]; mag += v*v; } sample = std::sqrt(mag);
-                } else sample = vec[idx];
+                sample = vec[idx];
                 tex[j*w + i] = (uint8_t)(255.0f * (sample - minv) / denom);
             }
         }
-        if (slice_buffer.tex_slice == 0) glGenTextures(1, &slice_buffer.tex_slice);
         glBindTexture(GL_TEXTURE_2D, slice_buffer.tex_slice);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -335,29 +350,14 @@ namespace MVF {
 
     void VolumeEntity::update_dvr_resources() {
         auto& desc = std::get<DVRDesc>(type.data);
-        if (!dvr_buffer.is_active) {
-            glGenVertexArrays(1, &dvr_buffer.vao);
-            glBindVertexArray(dvr_buffer.vao);
-            glGenBuffers(1, &dvr_buffer.vbo);
-            glBindBuffer(GL_ARRAY_BUFFER, dvr_buffer.vbo);
-            float quad[12] = {-1.f,-1.f,0.f, 1.f,-1.f,0.f, -1.f,1.f,0.f, 1.f,1.f,0.f};
-            glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),0);
-            glBindVertexArray(0);
-            dvr_buffer.is_active = true;
-        }
         auto it = model->scalars.find(desc.field); if (it==model->scalars.end()) return;
-        auto& vec = std::get<0>(it->second); auto comps = std::get<1>(it->second);
+        auto& vec = std::get<0>(it->second); 
         int nx=model->nx, ny=model->ny, nz=model->nz; dvr_buffer.nx=nx; dvr_buffer.ny=ny; dvr_buffer.nz=nz;
         std::vector<uint8_t> vol(nx*ny*nz);
         float minv=std::numeric_limits<float>::max(), maxv=-std::numeric_limits<float>::max();
-        if(comps>1){
-            for(size_t i=0;i<vec.size(); i+=comps){ float mag=0.f; for(int c=0;c<comps;++c){ float v=vec[i+c]; mag+=v*v;} mag=std::sqrt(mag); minv=std::min(minv,mag); maxv=std::max(maxv,mag);} }
-        else { for(size_t i=0;i<vec.size(); ++i){ float v=vec[i]; minv=std::min(minv,v); maxv=std::max(maxv,v);} }
+        for(size_t i=0;i<vec.size(); ++i){ float v=vec[i]; minv=std::min(minv,v); maxv=std::max(maxv,v); }
         float denom=(maxv-minv)>0?(maxv-minv):1.f;
-        for(int z=0; z<nz; ++z){ for(int y=0; y<ny; ++y){ for(int x=0; x<nx; ++x){ int idx=(z*ny + y)*nx + x; float sample; if(comps>1){ int base=idx*comps; float mag=0.f; for(int c=0;c<comps;++c){ float v=vec[base+c]; mag+=v*v;} sample=std::sqrt(mag);} else sample=vec[idx]; vol[idx]=(uint8_t)(255.f*(sample-minv)/denom); } } }
-        if(dvr_buffer.tex3d==0) glGenTextures(1,&dvr_buffer.tex3d);
+        for(int z=0; z<nz; ++z){ for(int y=0; y<ny; ++y){ for(int x=0; x<nx; ++x){ int idx=(z*ny + y)*nx + x; float sample; sample=vec[idx]; vol[idx]=(uint8_t)(255.f*(sample-minv)/denom); } } }
         glBindTexture(GL_TEXTURE_3D,dvr_buffer.tex3d);
         glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
         glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
@@ -383,7 +383,7 @@ namespace MVF {
             glBindVertexArray(0);
         }
         else if (type.mode == EntityMode::SCALAR_SLICE) {
-            auto pipeline = reinterpret_cast<SlicePipeline*>(pipelines[static_cast<int>(PipelineType::BOX)+1]);
+            auto pipeline = reinterpret_cast<SlicePipeline*>(pipelines[static_cast<int>(PipelineType::SLICE)]);
             glUseProgram(pipeline->shader_program);
             glBindVertexArray(slice_buffer.vao_slice);
             glActiveTexture(GL_TEXTURE0);

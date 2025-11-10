@@ -38,6 +38,7 @@ namespace MVF {
     private:
         bool on_key_pressed(guint keyval, guint keycode, Gdk::ModifierType state);
         // Trackball state
+        float current_zoom = 1.0f;
         bool trackball_active = false;
         int last_x = 0, last_y = 0;
         Quaternion trackball_quat = Quaternion(1,0,0,0);

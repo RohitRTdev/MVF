@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <ranges>
 #include "renderer.h"
-
+#include "pipeline.h"
 
 namespace MVF {
     void AttribRenderer::init(int width, int height) {
@@ -88,6 +88,9 @@ namespace MVF {
         for (auto& val: descriptors) {
             auto& comp = std::get<0>(data->scalars[val.comp_name]); 
             auto [min_val, max_val] = std::minmax_element(comp.begin(), comp.end());
+#ifdef MVF_DEBUG
+            std::cout << std::format("Field-{}: min_val={:.2f}, max_val={:.2f}", val.comp_name, *min_val, *max_val) << std::endl;
+#endif
             this->descriptors.push_back(AxisDescMeta {.desc = val, .min_val = *min_val, .max_val = *max_val});
         }
     }

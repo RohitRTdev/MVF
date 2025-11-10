@@ -3,6 +3,7 @@
 #include <sstream>
 #include <charconv>
 #include "vtk.h"
+#include "error.h"
 
 namespace MVF {
     bool read_file(const std::string& filename, std::string& out) {
@@ -119,6 +120,12 @@ namespace MVF {
                         size_t comps = 0, count = 0;
                         ss >> cur_tag >> comps >> count;
 
+                        if (comps != 1) {
+                            std::cerr << "Field " << cur_tag << " has more than one component. This is not supported right now..." << std::endl;
+                            read_failed = true;
+                            return;
+                        }
+
                         if (count * comps != field_size) {
                             std::cerr << "Field " << cur_tag << " size mismatch (" << count*comps << " vs " << field_size << ")" << std::endl;
                             read_failed = true;
@@ -130,7 +137,6 @@ namespace MVF {
                     }
 
                     auto& dest = std::get<0>(data->scalars[cur_tag]);
-                    auto comps = std::get<1>(data->scalars[cur_tag]);
 
                     while (ptr < end && cur_field_idx < field_size) {
                         // Skip whitespace

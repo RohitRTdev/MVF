@@ -11,9 +11,8 @@ constexpr float VIEW_THRESHOLD = 3.0f;
 
 namespace MVF {
 	Renderer::Renderer() : camera(Vector3f(0.0f, 0.0f, 0.0f), Vector3f(0.0f, 0.0f, 0.0f), Vector3f(0.0f, 1.0f, 0.0f)),
-	light(Vector3f(0.0f, 0.0f, 0.0f), Vector3f(1.0f, 1.0f, 1.0f)) {
-
-	}
+	light(Vector3f(0.0f, 0.0f, 0.0f), Vector3f(1.0f, 1.0f, 1.0f)) 
+	{}
 
 	void Renderer::init(int width, int height) {
 		glEnable(GL_DEPTH_TEST); 
