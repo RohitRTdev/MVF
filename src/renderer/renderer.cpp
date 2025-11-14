@@ -102,14 +102,14 @@ namespace MVF {
 		}
 
 		Matrix4f mvp = projection * camera.view * entity.world * entity.scale_transform * entity.init_transform;
-		const Vector3f box_color = Vector3f(0, 0, 0);
+		const Vector4f box_color = Vector4f(0, 0, 0, 1.0f);
 		auto light_position = light.get_position();
 		auto camera_position = camera.get_position();
 
 		auto pipeline_box = reinterpret_cast<BoxPipeline*>(pipelines[static_cast<int>(PipelineType::BOX)]);
 		glUseProgram(pipeline_box->shader_program);
 		glUniformMatrix4fv(pipeline_box->uMVP, 1, GL_TRUE, &mvp.m[0][0]);
-		glUniform3fv(pipeline_box->uColor, 1, (float*)&box_color);
+		glUniform4fv(pipeline_box->uColor, 1, (float*)&box_color);
 
         if (entity.get_mode() == EntityMode::VECTOR_GLYPH) {
             auto pipeline_vec = reinterpret_cast<VecGlyphPipeline*>(pipelines[static_cast<int>(PipelineType::VEC_GLYPH)]);

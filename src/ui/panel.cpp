@@ -107,9 +107,18 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler), 
     auto trait_label = make_managed<Label>("Trait selection");
     apply_button = Button("Apply");
     apply_button.set_hexpand(false);
+    apply_button.set_halign(Gtk::Align::CENTER);
     trait_sel.append("Point");
     trait_sel.append("Range");
     trait_sel.set_active(0);
+   
+    trait_sel.signal_changed().connect([this] () {
+        auto text = trait_sel.get_active_text();
+
+        auto attrib_handler = static_cast<MVF::AttribHandler*>(this->handler);
+        attrib_handler->set_point_trait_mode(text == "Point");
+    });  
+
 
     comp_list.set_sensitive(false);
     trait_sel.set_sensitive(false);

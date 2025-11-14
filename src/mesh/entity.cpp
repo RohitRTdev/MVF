@@ -39,8 +39,8 @@ namespace MVF {
         return type.mode;
     }
    
-    void VolumeEntity::destroy_buffers() {
-        if (box_buffer.is_active) {
+    void VolumeEntity::destroy_buffers(bool destroy_box) {
+        if (destroy_box && box_buffer.is_active) {
             glDeleteVertexArrays(1, &box_buffer.vao_bound_box);
             glDeleteBuffers(2, std::array{box_buffer.vbo_box, box_buffer.ebo_box}.data());
         }
@@ -73,9 +73,7 @@ namespace MVF {
    
     void VolumeEntity::set_box_mode() {
         type.mode = EntityMode::NONE;
-        if (vec_buffer.is_active) {
-            glDeleteBuffers(1, &vec_buffer.vbo_glyph);
-        }
+        destroy_buffers(false);
 
         vec_buffer.is_active = false;
     }
@@ -83,13 +81,16 @@ namespace MVF {
     void VolumeEntity::set_vector_mode(const std::string& field1, const std::string& field2, const std::string& field3) { 
         type.mode = EntityMode::VECTOR_GLYPH;
         type.data = VectorGlyphDesc{field1, field2, field3};
-
+        
+        destroy_buffers(false);
         create_buffers();
     }
 
     void VolumeEntity::set_scalar_slice(const std::string& field, int axis) {
         type.mode = EntityMode::SCALAR_SLICE;
         type.data = ScalarSliceDesc{field, axis};
+        
+        destroy_buffers(false);
         create_buffers();
         update_slice_resources();
     }
@@ -97,6 +98,8 @@ namespace MVF {
     void VolumeEntity::set_dvr(const std::string& field) {
         type.mode = EntityMode::DVR;
         type.data = DVRDesc{field};
+        
+        destroy_buffers(false);
         create_buffers();
         update_dvr_resources();
     }

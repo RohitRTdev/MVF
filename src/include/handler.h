@@ -49,11 +49,13 @@ namespace MVF {
         AttribHandler(AttribRenderer* renderer);
         void set_field_info(std::vector<AxisDesc>& descriptors);
         void clear_field_info();
+        void set_point_trait_mode(bool set_point_trait);
         friend MainWindow;
         friend AttributePanel;
 
     private:
         bool handle_traits = false;
+        bool is_point_trait = true;
         HoverOverlay mouse_overlay;
         std::vector<std::string> field_comps;
         void on_mouse_click(int n_press, double x, double y);

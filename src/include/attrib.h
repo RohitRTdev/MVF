@@ -20,6 +20,7 @@ namespace MVF {
 
     struct Interval {
         float left, right;
+        IntervalSelector mesh;
     };
 
     struct Polygon {
@@ -27,13 +28,18 @@ namespace MVF {
         float x_right, y_bottom;
     };
 
+    enum class RangeType {
+        INTERVAL,
+        POLYGON
+    };
+
     struct Range {
+        RangeType type;
         std::variant<Interval, Polygon> range;
     };
     
     struct Trait {
         TraitType type;
-        size_t num_dimensions;
         std::variant<Point, Range> data;
     };
 

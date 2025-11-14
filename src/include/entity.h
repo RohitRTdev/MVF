@@ -104,7 +104,7 @@ namespace MVF {
     public:
         VolumeEntity();
         void load_model(std::shared_ptr<VolumeData>& data);
-        void destroy_buffers();
+        void destroy_buffers(bool destroy_box = true);
         void set_box_mode();
         void set_vector_mode(const std::string& field1, const std::string& field2, const std::string& field3);
         void set_scalar_slice(const std::string& field, int axis = 2);

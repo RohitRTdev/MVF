@@ -240,6 +240,39 @@ namespace MVF {
             );
         }
     }
+    
+    void IntervalSelector::add_rect(float x, float y, float w, float h) {
+        // Triangle 1
+        vertices.push_back({x, y});
+        vertices.push_back({x + w, y});
+        vertices.push_back({x + w, y+h});
+
+        // Triangle 2
+        vertices.push_back({x, y});
+        vertices.push_back({x + w, y + h});
+        vertices.push_back({x, y+h});
+    }
+    
+    IntervalSelector::IntervalSelector(float x_left, float x_right, float center_y, 
+        float line_thickness, float handle_width, float handle_height) {
+        vertices.reserve(6 * 4); // 4 rectangles
+
+        float half_line = line_thickness * 0.5f;
+        float half_handle_w = handle_width * 0.5f;
+        float half_handle_h = handle_height * 0.5f;
+
+        // --- Base Line (full width from -1 to +1) ---
+        add_rect(x_left, center_y - half_line, x_right - x_left, line_thickness);
+
+        // --- Selected Region ---
+        add_rect(x_left, center_y - half_line, (x_right - x_left), line_thickness);
+
+        // --- Left Handle ---
+        add_rect(x_left - half_handle_w, center_y - half_handle_h, handle_width, handle_height);
+
+        // --- Right Handle ---
+        add_rect(x_right - half_handle_w, center_y - half_handle_h, handle_width, handle_height);
+    }
 
 }
 

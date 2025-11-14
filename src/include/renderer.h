@@ -66,13 +66,15 @@ namespace MVF {
         std::pair<std::vector<AxisDesc>, std::vector<Trait>> get_traits();
         void set_point_trait(float x);
         void set_point_trait(float x, float y);
+        void set_range_trait(float x1, float x2);
         void clear_traits();
 
     private:
         Axis axis_mesh_x, axis_mesh_y;
         PointMarker marker;
-        GLuint vao_x_axis, vao_y_axis, vao_marker;
-        GLuint vbo_x_axis, vbo_y_axis, vbo_marker, vbo_marker_pos;
+        GLuint vao_x_axis, vao_y_axis, vao_marker, vao_interval;
+        GLuint vbo_x_axis, vbo_y_axis, vbo_marker, vbo_marker_pos, vbo_interval;
+        size_t num_interval_vertices = 0;
         std::shared_ptr<VolumeData> data;
         std::vector<AxisDescMeta> descriptors;
         std::vector<Trait> traits;

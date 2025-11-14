@@ -88,6 +88,8 @@ Gtk::Box(Gtk::Orientation::VERTICAL), handler(fn) {
     set_spacing(4);
 
     main_button.set_label("Select Components ▼");
+    main_button.set_hexpand(false);
+    main_button.set_halign(Gtk::Align::CENTER);
     main_button.signal_clicked().connect(sigc::mem_fun(*this, &MultiSelectCombo::on_button_clicked));
     append(main_button);
 

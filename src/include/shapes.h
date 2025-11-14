@@ -78,4 +78,14 @@ namespace MVF {
     private:
         Vector2f rotate_line(Vector2f& pt, float angle);
     };
+
+    struct IntervalSelector {
+        std::vector<Vector2f> vertices;
+
+        IntervalSelector() = default;
+        IntervalSelector(float x_left, float x_right, float center_y, float line_thickness, float handle_width, float handle_height);
+    
+    private:
+        void add_rect(float x, float y, float w, float h);
+    };
 }

@@ -20,10 +20,12 @@ namespace MVF {
         glGenVertexArrays(1, &vao_x_axis);
         glGenVertexArrays(1, &vao_y_axis);
         glGenVertexArrays(1, &vao_marker);
+        glGenVertexArrays(1, &vao_interval);
         glGenBuffers(1, &vbo_x_axis);
         glGenBuffers(1, &vbo_y_axis);
         glGenBuffers(1, &vbo_marker);
         glGenBuffers(1, &vbo_marker_pos);
+        glGenBuffers(1, &vbo_interval);
         
         glBindVertexArray(vao_x_axis);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_x_axis);
@@ -51,6 +53,11 @@ namespace MVF {
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), 0);
         glVertexAttribDivisor(1, 1);
         
+        glBindVertexArray(vao_interval);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_interval);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), (void*)0);
+        
         glBindVertexArray(0);
         
         setup_traits();
@@ -64,12 +71,25 @@ namespace MVF {
         if (!traits.size()) {
             return;
         }
-        
-        auto vertices = traits | std::views::transform([] (auto& trait) {return std::get<Point>(trait.data);})
+    
+        // First, draw any marker points
+        auto vertices_point = traits | std::views::filter([] (auto& trait) {
+            return trait.type == TraitType::POINT;
+        }) | std::views::transform([] (auto& trait) {return std::get<Point>(trait.data);})
         | std::ranges::to<std::vector>();
             
         glBindBuffer(GL_ARRAY_BUFFER, vbo_marker_pos);
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Point), vertices.data(), GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, vertices_point.size() * sizeof(Point), vertices_point.data(), GL_DYNAMIC_DRAW);
+    
+        // Next, build the interval selectors
+        auto vertices_interval = traits | std::views::filter([] (auto& trait) {
+            return trait.type == TraitType::RANGE && std::get<Range>(trait.data).type == RangeType::INTERVAL;
+        }) | std::views::transform([] (auto& trait) {return std::get<Interval>(std::get<Range>(trait.data).range).mesh.vertices;})
+        | std::views::join | std::ranges::to<std::vector>();
+           
+        num_interval_vertices = vertices_interval.size();
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_interval);
+        glBufferData(GL_ARRAY_BUFFER, vertices_interval.size() * sizeof(Vector2f), vertices_interval.data(), GL_DYNAMIC_DRAW);
     }
     
     void AttribRenderer::set_field_data(std::shared_ptr<VolumeData>& vol) {
@@ -105,6 +125,7 @@ namespace MVF {
         
     void AttribRenderer::clear_traits() {
         traits.clear();
+        num_interval_vertices = 0;
     }
 
     void AttribRenderer::render() {
@@ -114,10 +135,10 @@ namespace MVF {
             return;
         }
 
-        const Vector3f box_color = Vector3f(0, 0, 0);
+        const Vector4f box_color = Vector4f(0, 0, 0, 1.0f);
 		auto pipeline_axis = reinterpret_cast<AxisPipeline*>(pipelines[static_cast<int>(PipelineType::AXIS)]);
 		glUseProgram(pipeline_axis->shader_program);
-		glUniform3fv(pipeline_axis->uColor, 1, (float*)&box_color);
+		glUniform4fv(pipeline_axis->uColor, 1, (float*)&box_color);
 
         glBindVertexArray(vao_x_axis);
         glDrawArrays(GL_TRIANGLES, 0, axis_mesh_x.vertices.size());
@@ -127,16 +148,29 @@ namespace MVF {
             glDrawArrays(GL_TRIANGLES, 0, axis_mesh_y.vertices.size());
         }
 
-        // Draw point traits for now
-        if (traits.size()) {
+        // Draw the traits
+        auto point_traits = std::ranges::distance(traits | std::views::filter([] (auto& trait) {
+            return trait.type == TraitType::POINT;
+        }));
+
+        if (point_traits) {
             // This should be drawn on top layer
             glClear(GL_DEPTH_BUFFER_BIT);
-            const Vector3f marker_color = Vector3f(1.0f, 0, 0);
+            const Vector4f marker_color = Vector4f(1.0f, 0, 0, 1.0f);
             auto pipeline_marker = reinterpret_cast<MarkerPipeline*>(pipelines[static_cast<int>(PipelineType::MARKER)]);
             glUseProgram(pipeline_marker->shader_program);
-            glUniform3fv(pipeline_marker->uColor, 1, (float*)&marker_color);
+            glUniform4fv(pipeline_marker->uColor, 1, (float*)&marker_color);
             glBindVertexArray(vao_marker);
-            glDrawArraysInstanced(GL_TRIANGLES, 0, marker.vertices.size(), traits.size());
+            glDrawArraysInstanced(GL_TRIANGLES, 0, marker.vertices.size(), point_traits);
+        }
+       
+        if (num_interval_vertices) {
+            const Vector4f interval_color = Vector4f(1.0f, 0.8f, 0, 0.5f);
+            glUseProgram(pipeline_axis->shader_program);
+            glUniform4fv(pipeline_axis->uColor, 1, (float*)&interval_color);
+
+            glBindVertexArray(vao_interval);
+            glDrawArrays(GL_TRIANGLES, 0, num_interval_vertices);
         }
 
         glBindVertexArray(0);
@@ -145,7 +179,17 @@ namespace MVF {
     void AttribRenderer::resync() {
         setup_buffers();
     }
-    
+   
+    void AttribRenderer::set_range_trait(float x1, float x2) {
+        if (descriptors.size() != 1 || std::abs(x1) >= AXIS_LENGTH / 2 || std::abs(x2) >= AXIS_LENGTH / 2) {
+            return;
+        }
+
+        traits.push_back(Trait {.type = TraitType::RANGE, .data = Range{.type = RangeType::INTERVAL, .range = Interval{.left = x1, .right = x2, 
+            .mesh = IntervalSelector(x1, x2, 0, 0.01f, 0.03f, 0.1f)}}});
+        setup_traits();
+    }
+
     void AttribRenderer::set_point_trait(float x) {
         set_point_trait(x, 0);        
     }
@@ -157,11 +201,7 @@ namespace MVF {
         
         traits.push_back(Trait {.type = TraitType::POINT, .data = Point{.x = x, .y = y}});
 
-        auto vertices = traits | std::views::transform([] (auto& trait) {return std::get<Point>(trait.data);})
-        | std::ranges::to<std::vector>();
-            
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_marker_pos);
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Point), vertices.data(), GL_DYNAMIC_DRAW);
+        setup_traits();
     }
     
     float AttribRenderer::get_field_point(float t, size_t id) {

@@ -194,31 +194,6 @@ namespace MVF {
         auto spatial_renderer = static_cast<SpatialRenderer*>(renderer);
 
         switch (keyval) {
-        case GDK_KEY_w: {
-            spatial_renderer->entity.rotate(ROTATION_FACTOR, 0, 0);
-            break;
-        }
-        case GDK_KEY_s: {
-            spatial_renderer->entity.rotate(-ROTATION_FACTOR, 0, 0);
-            break;
-
-        }
-        case GDK_KEY_a: {
-            spatial_renderer->entity.rotate(0, 0, ROTATION_FACTOR);
-            break;
-        }
-        case GDK_KEY_d: {
-            spatial_renderer->entity.rotate(0, 0, -ROTATION_FACTOR);
-            break;
-        }
-        case GDK_KEY_q: {
-            spatial_renderer->entity.rotate(0, ROTATION_FACTOR, 0);
-            break;
-        }
-        case GDK_KEY_e: {
-            spatial_renderer->entity.rotate(0, -ROTATION_FACTOR, 0);
-            break;
-        }
         case GDK_KEY_z: {
             current_zoom += ZOOM_FACTOR;
             spatial_renderer->entity.scale(current_zoom);
@@ -273,6 +248,7 @@ namespace MVF {
     void SpatialHandler::reset_camera() {
         current_zoom = 1.0f;
         static_cast<SpatialRenderer*>(renderer)->entity.reset_transform();
+        trackball_quat = Quaternion();    
         queue_render();
     }
 
@@ -295,8 +271,17 @@ namespace MVF {
 
         handle_traits = true;
         make_current();
-        field_comps.size() == 1 ? static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc) : 
-        static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc, y_ndc);
+        if (is_point_trait) {
+            field_comps.size() == 1 ? static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc) : 
+            static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc, y_ndc);
+        }
+        else {
+            static_cast<AttribRenderer*>(renderer)->set_range_trait(-0.5f, 0.5f);
+        }
         queue_render();
+    }
+        
+    void AttribHandler::set_point_trait_mode(bool set_point_trait) {
+        is_point_trait = set_point_trait;
     }
 }
