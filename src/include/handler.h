@@ -56,6 +56,7 @@ namespace MVF {
     private:
         bool handle_traits = false;
         bool is_point_trait = true;
+        bool activate_range_selection = false; 
         HoverOverlay mouse_overlay;
         std::vector<std::string> field_comps;
         void on_mouse_click(int n_press, double x, double y);

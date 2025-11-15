@@ -24,8 +24,9 @@ namespace MVF {
     };
 
     struct Polygon {
-        float x_left, y_top;
-        float x_right, y_bottom;
+        float x_top, y_top;
+        float width, height;
+        PolySelector mesh;
     };
 
     enum class RangeType {

@@ -10,6 +10,7 @@
 constexpr float ROTATION_FACTOR = 1.0f;
 constexpr float ZOOM_FACTOR = 0.01f;
 constexpr float DETECT_THRESHOLD = 0.015f;
+constexpr float RANGE_ZERO_WIDTH = 0.01f;
 
 // Widget -> Top left is (0, 0) and bottom right is (max_width, max_height)
 // NDC -> Center is (0, 0). Y increases upwards and X increases towards the right
@@ -158,6 +159,15 @@ namespace MVF {
                 text.append(std::format("\n{}={:.2f}", field_comps[1], y_f));
             }
             this->mouse_overlay.show_at(static_cast<int>(x), static_cast<int>(y), text);
+            
+            if (activate_range_selection) {
+                field_comps.size() == 1 ? static_cast<AttribRenderer*>(this->renderer)->modify_range_trait(x_ndc) :
+                static_cast<AttribRenderer*>(this->renderer)->modify_range_trait(x_ndc, y_ndc);
+            }
+        });
+        
+        mouse_click->signal_released().connect([this] (int, double, double) {
+            activate_range_selection = false;
         });
 
         motion->signal_leave().connect([this] {
@@ -276,7 +286,9 @@ namespace MVF {
             static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc, y_ndc);
         }
         else {
-            static_cast<AttribRenderer*>(renderer)->set_range_trait(-0.5f, 0.5f);
+            activate_range_selection = true;
+            field_comps.size() == 1 ? static_cast<AttribRenderer*>(renderer)->set_range_trait(x_ndc, x_ndc + RANGE_ZERO_WIDTH) :
+            static_cast<AttribRenderer*>(renderer)->set_range_trait(x_ndc, y_ndc, RANGE_ZERO_WIDTH, RANGE_ZERO_WIDTH);
         }
         queue_render();
     }

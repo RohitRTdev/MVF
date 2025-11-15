@@ -241,7 +241,7 @@ namespace MVF {
         }
     }
     
-    void IntervalSelector::add_rect(float x, float y, float w, float h) {
+    static void add_rect(std::vector<Vector2f>& vertices, float x, float y, float w, float h) {
         // Triangle 1
         vertices.push_back({x, y});
         vertices.push_back({x + w, y});
@@ -261,18 +261,26 @@ namespace MVF {
         float half_handle_w = handle_width * 0.5f;
         float half_handle_h = handle_height * 0.5f;
 
-        // --- Base Line (full width from -1 to +1) ---
-        add_rect(x_left, center_y - half_line, x_right - x_left, line_thickness);
+        // Base Line (full width from -1 to +1)
+        add_rect(vertices, x_left, center_y - half_line, x_right - x_left, line_thickness);
 
-        // --- Selected Region ---
-        add_rect(x_left, center_y - half_line, (x_right - x_left), line_thickness);
+        // Selected Region
+        add_rect(vertices, x_left, center_y - half_line, (x_right - x_left), line_thickness);
 
-        // --- Left Handle ---
-        add_rect(x_left - half_handle_w, center_y - half_handle_h, handle_width, handle_height);
+        // Left Handle
+        add_rect(vertices, x_left - half_handle_w, center_y - half_handle_h, handle_width, handle_height);
 
-        // --- Right Handle ---
-        add_rect(x_right - half_handle_w, center_y - half_handle_h, handle_width, handle_height);
+        // Right Handles
+        add_rect(vertices, x_right - half_handle_w, center_y - half_handle_h, handle_width, handle_height);
     }
 
+    PolySelector::PolySelector(float x_top, float y_top, float width, float height) {
+        add_rect(tri_vertices, x_top, y_top, width, height);
+        
+        pt_vertices.push_back(Vector2f(x_top, y_top));
+        pt_vertices.push_back(Vector2f(x_top + width, y_top));
+        pt_vertices.push_back(Vector2f(x_top, y_top + height));
+        pt_vertices.push_back(Vector2f(x_top + width, y_top + height));
+    }
 }
 

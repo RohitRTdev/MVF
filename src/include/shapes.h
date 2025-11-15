@@ -84,8 +84,12 @@ namespace MVF {
 
         IntervalSelector() = default;
         IntervalSelector(float x_left, float x_right, float center_y, float line_thickness, float handle_width, float handle_height);
-    
-    private:
-        void add_rect(float x, float y, float w, float h);
+    };
+
+    struct PolySelector {
+        std::vector<Vector2f> tri_vertices, pt_vertices;
+
+        PolySelector() = default;
+        PolySelector(float x_top, float y_top, float width, float height);
     };
 }

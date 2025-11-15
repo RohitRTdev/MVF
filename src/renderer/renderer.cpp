@@ -17,6 +17,7 @@ namespace MVF {
 	void Renderer::init(int width, int height) {
 		glEnable(GL_DEPTH_TEST); 
 		glEnable(GL_BLEND);
+		glEnable(GL_PROGRAM_POINT_SIZE);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		set_viewport(width, height);
 
