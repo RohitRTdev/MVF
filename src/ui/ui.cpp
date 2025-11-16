@@ -79,6 +79,15 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
                 attrib_panel.set_button_inactive();
                 trait_handler_pending = false;
             }
+        },
+        {
+            .tooltip_text = "Show/hide plot",
+            .handler = [this] {
+                attrib_handler.make_current();
+                attrib_renderer.enable_scatter_plot(show_plot);
+                attrib_handler.queue_render();
+                show_plot = !show_plot;
+            }
         }
     });
 

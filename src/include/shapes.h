@@ -26,6 +26,11 @@ namespace MVF {
         Vector3f direction;
         float scale;
     };
+    
+    struct PointVertex {
+        Vector2f position;
+        Vector2f uv;
+    };
 #pragma pack(pop)
 
     struct ArrowMesh {

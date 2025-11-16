@@ -23,6 +23,7 @@ namespace MVF {
         glGenVertexArrays(1, &vao_interval);
         glGenVertexArrays(1, &vao_polyline);
         glGenVertexArrays(1, &vao_polypoint);
+        glGenVertexArrays(1, &vao_scatterplot);
 
         glGenBuffers(1, &vbo_x_axis);
         glGenBuffers(1, &vbo_y_axis);
@@ -31,6 +32,7 @@ namespace MVF {
         glGenBuffers(1, &vbo_interval);
         glGenBuffers(1, &vbo_polyline);
         glGenBuffers(1, &vbo_polypoint);
+        glGenBuffers(1, &vbo_scatterplot);
         
         glBindVertexArray(vao_x_axis);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_x_axis);
@@ -73,13 +75,29 @@ namespace MVF {
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), (void*)0);
         
+        glBindVertexArray(vao_scatterplot);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_scatterplot);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(PointVertex), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(PointVertex), (void*)sizeof(Vector2f));
+
         glBindVertexArray(0);
-        
         setup_traits();
+        setup_plot();
 
 #ifdef MVF_DEBUG
         std::cout << "Created attribute space static mesh buffers..." << std::endl;
 #endif
+    }
+        
+    void AttribRenderer::setup_plot() {
+        if (!scatter_plot.size()) {
+            return;
+        }
+
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_scatterplot);
+        glBufferData(GL_ARRAY_BUFFER, scatter_plot.size() * sizeof(PointVertex), scatter_plot.data(), GL_DYNAMIC_DRAW);
     }
     
     void AttribRenderer::setup_traits() {
@@ -143,6 +161,8 @@ namespace MVF {
         data = vol;
         descriptors.clear();
         clear_traits();
+        scatter_plot.clear();
+        is_scatter_plot_visible = false;
     }
     
     void AttribRenderer::set_attrib_space_axis(const std::vector<AxisDesc>& descriptors) {
@@ -160,8 +180,59 @@ namespace MVF {
 #endif
             this->descriptors.push_back(AxisDescMeta {.desc = val, .min_val = *min_val, .max_val = *max_val});
         }
+
+        if (descriptors.size() == 2) {
+            generate_scatter_plot();
+        }
     }
-        
+            
+    void AttribRenderer::generate_scatter_plot() {
+        if (descriptors.size() != 2) {
+            throw std::runtime_error("generate_scatter_plot() called with descriptors.size() != 2");
+        }
+
+        constexpr float point_width = 0.1f;
+        constexpr size_t sample_period = 10000;
+
+        auto& field1 = std::get<0>(data->scalars[descriptors[0].desc.comp_name]);  
+        auto& field2 = std::get<0>(data->scalars[descriptors[1].desc.comp_name]);  
+
+        // Since we're generating 6 vertices per point (to represent quad)
+        const auto num_points = (field1.size() * field2.size() * 6) / (sample_period * sample_period); 
+#ifdef MVF_DEBUG
+        std::cout << "Total vertices for 2d scatter plot: " << num_points << std::endl;
+#endif
+        scatter_plot.clear();
+        scatter_plot.reserve(num_points);
+        for (size_t x_idx = 0; x_idx < field1.size(); x_idx += sample_period) {
+            auto x_norm = 2 * (field1[x_idx] - descriptors[0].min_val) / (descriptors[0].max_val - descriptors[0].min_val) - 1;
+            for (size_t y_idx = 0; y_idx < field2.size(); y_idx += sample_period) {
+                auto y_norm = 2 * (field2[y_idx] - descriptors[1].min_val) / (descriptors[1].max_val - descriptors[1].min_val) - 1;
+                
+                // Generate a quad that represents this 2d point
+                auto top_left = PointVertex{.position = Vector2f(x_norm - point_width / 2, y_norm + point_width / 2), .uv = Vector2f(-1, 1)};
+                auto top_right = PointVertex{.position = Vector2f(x_norm + point_width / 2, y_norm + point_width / 2), .uv = Vector2f(1, 1)};
+                auto bottom_left = PointVertex{.position = Vector2f(x_norm - point_width / 2, y_norm - point_width / 2), .uv = Vector2f(-1, -1)};
+                auto bottom_right = PointVertex{.position = Vector2f(x_norm + point_width / 2, y_norm - point_width / 2), .uv = Vector2f(1, -1)};
+                
+                scatter_plot.push_back(top_left);
+                scatter_plot.push_back(top_right);
+                scatter_plot.push_back(bottom_left);
+                scatter_plot.push_back(bottom_left);
+                scatter_plot.push_back(top_right);
+                scatter_plot.push_back(bottom_right);
+            }
+        }
+    }
+    
+    void AttribRenderer::enable_scatter_plot(bool enable) {
+        if (enable) {
+            setup_plot();
+        }
+
+        is_scatter_plot_visible = enable;
+    }
+
     std::pair<std::vector<AxisDesc>, std::vector<Trait>> AttribRenderer::get_traits() {
         auto desc = this->descriptors | std::views::transform([] (const AxisDescMeta& val) {
             return val.desc;
@@ -175,16 +246,6 @@ namespace MVF {
         num_interval_vertices = 0;
         num_range_pt_vertices = 0;
         num_range_tri_vertices = 0;
-
-        // Just clear up all the buffers
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_interval);
-        glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
-        
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_polyline);
-        glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
-        
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_polypoint);
-        glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
     }
 
     void AttribRenderer::render() {
@@ -205,6 +266,17 @@ namespace MVF {
         if (descriptors.size() == 2) {
             glBindVertexArray(vao_y_axis);
             glDrawArrays(GL_TRIANGLES, 0, axis_mesh_y.vertices.size());
+        
+            // Draw the scatter plot
+            if (is_scatter_plot_visible && scatter_plot.size()) {
+                const Vector4f point_color = Vector4f(1.0, 0, 1.0, 1.0f);
+                auto pipeline_point = reinterpret_cast<PointPipeline*>(pipelines[static_cast<int>(PipelineType::POINT)]);
+                glUseProgram(pipeline_point->shader_program);
+                glUniform4fv(pipeline_point->uColor, 1, (float*)&point_color);
+
+                glBindVertexArray(vao_scatterplot);
+                glDrawArrays(GL_TRIANGLES, 0, scatter_plot.size());
+            }
         }
 
         // Draw the traits
