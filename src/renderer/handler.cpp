@@ -172,6 +172,7 @@ namespace MVF {
 
         motion->signal_leave().connect([this] {
             mouse_overlay.hide_now();
+            activate_range_selection = false;
         });
 
         add_controller(motion);

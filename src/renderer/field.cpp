@@ -93,28 +93,50 @@ namespace MVF {
 
             // Calculate the min distance of the traits to this point
             // For now, we do this naively
-            // TODO: Extend for range traits...
             for (auto& trait: traits) {
+                float dist = INFINITY;
                 switch(trait.type) {
                     case TraitType::POINT: {
                         auto& tr_pt = std::get<Point>(trait.data);
                         
                         // Calculate euclidean dist
-                        float dist;
                         if (attrib_comps.size() == 1) {
                             dist = (tr_pt.x - pt[0]) * (tr_pt.x - pt[0]);
                         } 
                         else {
                             dist = (tr_pt.y - pt[1]) * (tr_pt.y - pt[1]) + (tr_pt.x - pt[0]) * (tr_pt.x - pt[0]);
                         } 
-                        min_dist = std::min(dist, min_dist);
 
                         break;
                     }
-                    default: {
-                        throw std::runtime_error("Only point trait supported right now....");
+                    case TraitType::RANGE: {
+                        if (std::get<Range>(trait.data).type == RangeType::INTERVAL) {
+                            auto& tr_int = std::get<Interval>(std::get<Range>(trait.data).range);
+                            if (pt[0] >= tr_int.left && pt[0] <= tr_int.right) {
+                                dist = 0;
+                            }
+                            else {
+                                dist = std::min(std::abs(tr_int.left - pt[0]), std::abs(tr_int.right - pt[0]));
+                            }
+                        }
+                        else {
+                            // We are cheating a bit here. Instead of finding closest point 
+                            // (using something like AABB intersection), we're just calculating
+                            // the distance to the midpoint of the polygonal trait
+                            auto& tr_poly = std::get<Polygon>(std::get<Range>(trait.data).range);
+                            if (pt[0] >= tr_poly.x_top && pt[0] <= tr_poly.x_top + tr_poly.width 
+                            && pt[1] >= tr_poly.y_top && pt[1] >= tr_poly.y_top + tr_poly.height) {
+                                dist = 0;
+                            }
+                            else {
+                                float mid_pt_x = tr_poly.x_top + tr_poly.width / 2;   
+                                float mid_pt_y = tr_poly.y_top + tr_poly.height / 2;   
+                                dist = (mid_pt_y - pt[1]) * (mid_pt_y - pt[1]) + (mid_pt_x - pt[0]) * (mid_pt_x - pt[0]);
+                            }
+                        }
                     }
                 }
+                min_dist = std::min(dist, min_dist);
             }
 
             // This is for normalization purposes
@@ -158,27 +180,41 @@ namespace MVF {
         this->attrib_comps = attrib_comps;
         this->traits = traits;
 
+        // [-AXIS_LENGTH / 2, AXIS_LENGTH / 2] -> [min_val, max_val]
+        auto get_pt_norm = [this] (float val, size_t fld_dim) {
+            auto pt_norm = val / (AXIS_LENGTH / 2);
+            return 0.5 * ((this->attrib_comps[fld_dim].max_val + this->attrib_comps[fld_dim].min_val) + pt_norm * 
+                (this->attrib_comps[fld_dim].max_val - this->attrib_comps[fld_dim].min_val));
+        };
+
         // Convert the trait points from screen space to attribute space
         for(auto& trait: this->traits) {
             switch(trait.type) {
                 case TraitType::POINT: {
                     auto& tr_pt = std::get<Point>(trait.data);
                    
-                    // [-AXIS_LENGTH / 2, AXIS_LENGTH / 2] -> [min_val, max_val]
-                    auto x_norm = tr_pt.x / (AXIS_LENGTH / 2);
-                    auto x_f = 0.5 * ((attrib_comps[0].max_val + attrib_comps[0].min_val) + x_norm * 
-                    (attrib_comps[0].max_val - attrib_comps[0].min_val));
+                    auto x_f = get_pt_norm(tr_pt.x, 0);
                     
                     if (attrib_comps.size() < 2) {
                         tr_pt.x = x_f;
                     } 
                     
                     if (attrib_comps.size() == 2) {
-                        auto y_norm = tr_pt.y / (AXIS_LENGTH / 2);
-                        auto y_f = 0.5 * ((attrib_comps[0].max_val + attrib_comps[0].min_val) + y_norm * 
-                        (attrib_comps[0].max_val - attrib_comps[0].min_val));
-                        tr_pt.y = y_f;
+                        tr_pt.y = get_pt_norm(tr_pt.y, 0);
                     } 
+                    break;
+                }
+                case TraitType::RANGE: {
+                    if (std::get<Range>(trait.data).type == RangeType::INTERVAL) {
+                        auto& tr_int = std::get<Interval>(std::get<Range>(trait.data).range);
+                        tr_int.left = get_pt_norm(tr_int.left, 0);
+                        tr_int.right = get_pt_norm(tr_int.right, 0);
+                    }
+                    else {
+                        auto& tr_poly = std::get<Polygon>(std::get<Range>(trait.data).range);
+                        tr_poly.x_top = get_pt_norm(tr_poly.x_top, 0);
+                        tr_poly.y_top = get_pt_norm(tr_poly.y_top, 0);
+                    }
                 }
             }
         }
@@ -195,6 +231,7 @@ namespace MVF {
     void FieldEntity::cancel_dist_computation() {
        stop_requested.store(true, std::memory_order_acquire);
        complete_set_traits();
+       compute_passed = true;
     }
         
     void FieldEntity::set_isovalue(float value) {

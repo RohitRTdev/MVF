@@ -8,6 +8,8 @@ using namespace Gtk;
 
 MainWindow* global_ui_inst = nullptr;
 
+// This is a side channel generic function any entity can use to communicate to UI when there 
+// is need for asynchronous computation
 void advance_ui_clock(float fraction, bool complete) {
     if (!global_ui_inst->is_async_ui_state) {
         throw std::runtime_error("advance_ui_clock() called in synchronous mode..");
@@ -305,7 +307,6 @@ Gtk::Box* MainWindow::build_menu(const std::vector<ButtonDescriptor>& desc) {
 
     return hbox;
 }
-
 
 bool MainWindow::on_window_close() {
     if (file_loader_conn.connected()) {
