@@ -219,13 +219,17 @@ void AttributePanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     handler->queue_render();
 }
     
-void FieldPanel::set_traits(const std::vector<MVF::AxisDesc>& attrib_comps, const std::vector<MVF::Trait>& traits) {
-    rep_menu.set_sensitive(true);
-    iso_slider.set_sensitive(true);
-
+void FieldPanel::set_traits(const std::vector<MVF::AxisDescMeta>& attrib_comps, const std::vector<MVF::Trait>& traits) {
     handler->make_current();
     auto field_handler = static_cast<MVF::FieldRenderer*>(handler->renderer); 
     field_handler->entity.set_traits(attrib_comps, traits);
+}
+    
+void FieldPanel::complete_set_traits() {
+    rep_menu.set_sensitive(true);
+    iso_slider.set_sensitive(true);
+    auto field_handler = static_cast<MVF::FieldRenderer*>(handler->renderer); 
+    field_handler->entity.complete_set_traits();
     handler->queue_render();
 }
 

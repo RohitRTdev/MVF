@@ -2,6 +2,7 @@
 
 #include <variant>
 #include <atomic>
+#include <mutex>
 #include "vtk.h"
 #include "math_utils.h"
 #include "shapes.h"
@@ -165,7 +166,9 @@ namespace MVF {
 
         FieldEntity();
         void init(VolumeEntity* geometry_entity);
-        void set_traits(const std::vector<AxisDesc>& attrib_comps, const std::vector<Trait>& traits);
+        void set_traits(const std::vector<AxisDescMeta>& attrib_comps, const std::vector<Trait>& traits);
+        void complete_set_traits();
+        void cancel_dist_computation();
         void clear_traits();
         void set_isovalue(float value);
         friend FieldRenderer;
@@ -179,10 +182,14 @@ namespace MVF {
         float iso_value = 0;
         std::vector<Vertex> points;
         std::vector<float> field;
-        std::vector<AxisDesc> attrib_comps;
+        std::vector<AxisDescMeta> attrib_comps;
         std::vector<Trait> traits;
         VolumeEntity* geometry_entity;
+        std::mutex dist_fld_lock;
+        std::thread worker_thread; 
         bool set_draw_mode = false;
+        bool compute_passed = true; 
+        std::atomic<bool> stop_requested = false; 
 
         void create_voxel_grid();
         void create_buffers();

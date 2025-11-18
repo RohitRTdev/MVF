@@ -18,6 +18,7 @@ public:
     
 
     friend MVF::RenderHandler;
+    friend void advance_ui_clock(float fraction, bool complete);
 private:
 
     struct ButtonDescriptor {
@@ -28,9 +29,14 @@ private:
 
     void on_file_open();
     bool file_load_handler();
+    bool generic_async_handler();
     bool on_window_close();
     bool on_key_press();
     void toggle_attrib_space();
+    void set_progress(float fraction);
+    void enable_ui_async_state();
+    void disable_ui_async_state();
+    void complete_async_state();
     Gtk::Box* build_menu(const std::vector<ButtonDescriptor>& desc);
 
     bool is_attrib_space_visible = false;
@@ -40,7 +46,9 @@ private:
     bool trait_handler_pending = false;
     bool clear_handler_pending = false;
     bool show_plot = true;
-    
+    bool is_async_ui_state = false;
+    float async_progress = 0;
+
     sigc::connection file_loader_conn;
     std::unique_ptr<MVF::LoadProxy> loader;
     std::shared_ptr<MVF::VolumeData> data;

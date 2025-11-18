@@ -6,10 +6,25 @@
 
 using namespace Gtk;
 
+MainWindow* global_ui_inst = nullptr;
+
+void advance_ui_clock(float fraction, bool complete) {
+    if (!global_ui_inst->is_async_ui_state) {
+        throw std::runtime_error("advance_ui_clock() called in synchronous mode..");
+    }
+
+    global_ui_inst->async_progress = fraction;
+    if (complete) {
+        global_ui_inst->disable_ui_async_state();
+    }
+}
+
 MainWindow::MainWindow() : spatial_handler(&spatial_renderer), field_handler(&field_renderer), attrib_handler(&attrib_renderer), 
 spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&field_handler) {
     extern MVF::ErrorBox main_error_box;
-    
+
+    global_ui_inst = this;
+
     set_title("MVF");
     set_default_size(1024, 1024);
     main_error_box = MVF::ErrorBox(this, get_application().get());
@@ -67,6 +82,10 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
             .tooltip_text = "Clear traits",
             .icon_filename = "assets/reset.png",
             .handler = [this] {
+                if (is_async_ui_state) {
+                    return;
+                }
+
                 attrib_renderer.clear_traits();
                 attrib_handler.queue_render();
                 if (is_feature_space_visible) {
@@ -104,6 +123,10 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
             .tooltip_text = "Switch to domain space",
             .icon_filename = "assets/toggle-off.png",
             .handler = [this, key_controller_spatial, key_controller_field] {
+                if (is_async_ui_state) {
+                    return;
+                }
+                
                 pane.set_start_child(spatial_box); 
                 m_uibox.remove(field_panel);
                 m_uibox.prepend(spatial_panel);
@@ -184,10 +207,17 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
     });
 
     attrib_panel.apply_button.signal_clicked().connect([this] {
+        if (is_async_ui_state) {
+#ifdef MVF_DEBUG
+            std::cout << "Distance field computation ongoing..." << std::endl;
+#endif
+            return;
+        }
         attrib_panel.set_button_inactive();
         trait_handler_pending = false;
 
         auto [comp, traits] = attrib_renderer.get_traits();
+        enable_ui_async_state();
         field_panel.set_traits(comp, traits);
     });
 
@@ -213,7 +243,36 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
 
     signal_close_request().connect(sigc::mem_fun(*this, &MainWindow::on_window_close), false);
 }
+    
+bool MainWindow::generic_async_handler() {
+    if(!is_async_ui_state) {
+        field_panel.complete_set_traits();
+        return false;
+    }
 
+    progress_bar.set_fraction(async_progress);
+    return true;
+}
+    
+void MainWindow::enable_ui_async_state() {
+    if (file_loader_conn.connected()) {
+        throw std::runtime_error("enable_ui_async_state() called when file_loader_conn is connected...");
+    }
+    progress_bar.show();
+    progress_bar.set_fraction(0);
+    async_progress = 0;
+    file_loader_conn = Glib::signal_timeout().connect(sigc::mem_fun(*this, &MainWindow::generic_async_handler), 16);
+    is_async_ui_state = true;
+}
+
+void MainWindow::disable_ui_async_state() {
+    if (!is_async_ui_state) {
+        return;
+    }
+    progress_bar.hide();
+    is_async_ui_state = false;
+}
+    
 void MainWindow::toggle_attrib_space() {
     if (is_attrib_space_visible) {
         pane.unset_end_child();
@@ -252,6 +311,7 @@ bool MainWindow::on_window_close() {
     if (file_loader_conn.connected()) {
         loader->cancel_io();
         loader->complete();
+        field_renderer.entity.cancel_dist_computation();
     }
 
     return false;
@@ -259,10 +319,12 @@ bool MainWindow::on_window_close() {
 
 void MainWindow::on_file_open() {
     if (file_loader_conn.connected()) {
-        std::cout << "File loading in progress..." << std::endl;
+#ifdef MVF_DEBUG
+        std::cout << "Timer lock could not be obtained..." << std::endl;
+#endif
         return;
     }
-    
+
     auto dialog = FileChooserNative::create(
         "Select a vtk file",
         *this,

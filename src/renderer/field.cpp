@@ -3,6 +3,7 @@
 #include "entity.h"
 #include "marching_cubes.h"
 #include "attrib.h"
+#include "ui_async.h"
 
 namespace MVF {
     FieldEntity::FieldEntity() : Entity::Entity(Vector3f(0, 0, 0)) {
@@ -77,11 +78,16 @@ namespace MVF {
         float max_dist = 0;
         for (int i = 0; i < grid_size; i++) {
             float min_dist = INFINITY;
-            
+            if (stop_requested.load(std::memory_order_acquire)) {
+                compute_passed = false;
+                return;
+            }
+           
+            advance_ui_clock(static_cast<float>(i) / grid_size, false);
             // Get the point in attribute space for this point in domain
             std::vector<float> pt(attrib_comps.size());
             for (size_t dim = 0; dim < attrib_comps.size(); dim++) {
-                auto& fld = std::get<0>(geometry_entity->model->scalars[attrib_comps[dim].comp_name]);
+                auto& fld = std::get<0>(geometry_entity->model->scalars[attrib_comps[dim].desc.comp_name]);
                 pt[dim] = fld[i];
             }
 
@@ -129,15 +135,66 @@ namespace MVF {
         );
     }
 
-    void FieldEntity::set_traits(const std::vector<AxisDesc>& attrib_comps, const std::vector<Trait>& traits) {
+    // Our distance field computation is done
+    // We can release lock and perform any stalled computation
+    void FieldEntity::complete_set_traits() {
+        if (worker_thread.joinable()) {
+            worker_thread.join();
+        }
+        
+        if (compute_passed) {
+            build_texture();
+        }
+        dist_fld_lock.unlock();
+    }
+
+    void FieldEntity::set_traits(const std::vector<AxisDescMeta>& attrib_comps, const std::vector<Trait>& traits) {
         if (attrib_comps.size() != 1 && attrib_comps.size() != 2) {
             throw std::runtime_error("Only 1 and 2 dimensional traits supported for now...");
         }
 
+        dist_fld_lock.lock();
+
         this->attrib_comps = attrib_comps;
         this->traits = traits;
-        build_distance_field();
-        build_texture();
+
+        // Convert the trait points from screen space to attribute space
+        for(auto& trait: this->traits) {
+            switch(trait.type) {
+                case TraitType::POINT: {
+                    auto& tr_pt = std::get<Point>(trait.data);
+                   
+                    // [-AXIS_LENGTH / 2, AXIS_LENGTH / 2] -> [min_val, max_val]
+                    auto x_norm = tr_pt.x / (AXIS_LENGTH / 2);
+                    auto x_f = 0.5 * ((attrib_comps[0].max_val + attrib_comps[0].min_val) + x_norm * 
+                    (attrib_comps[0].max_val - attrib_comps[0].min_val));
+                    
+                    if (attrib_comps.size() < 2) {
+                        tr_pt.x = x_f;
+                    } 
+                    
+                    if (attrib_comps.size() == 2) {
+                        auto y_norm = tr_pt.y / (AXIS_LENGTH / 2);
+                        auto y_f = 0.5 * ((attrib_comps[0].max_val + attrib_comps[0].min_val) + y_norm * 
+                        (attrib_comps[0].max_val - attrib_comps[0].min_val));
+                        tr_pt.y = y_f;
+                    } 
+                }
+            }
+        }
+
+        // Important to make sure that build_distance_field doesn't call any opengl functions
+        worker_thread = std::thread([this] {
+            stop_requested.store(false, std::memory_order_release);
+            compute_passed = true;
+            build_distance_field();
+            advance_ui_clock(1, true);
+        });
+    }
+
+    void FieldEntity::cancel_dist_computation() {
+       stop_requested.store(true, std::memory_order_acquire);
+       complete_set_traits();
     }
         
     void FieldEntity::set_isovalue(float value) {

@@ -69,7 +69,8 @@ public:
     FieldPanel(MVF::SpatialHandler* handler);
     void load_model(std::shared_ptr<MVF::VolumeData>& data);
     void clear_traits();
-    void set_traits(const std::vector<MVF::AxisDesc>& attrib_comps, const std::vector<MVF::Trait>& traits);
+    void set_traits(const std::vector<MVF::AxisDescMeta>& attrib_comps, const std::vector<MVF::Trait>& traits);
+    void complete_set_traits();
     void enable_panel();
     void disable_panel();
 private:

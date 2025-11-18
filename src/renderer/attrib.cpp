@@ -215,12 +215,8 @@ namespace MVF {
         is_plot_visible = enable;
     }
 
-    std::pair<std::vector<AxisDesc>, std::vector<Trait>> AttribRenderer::get_traits() {
-        auto desc = this->descriptors | std::views::transform([] (const AxisDescMeta& val) {
-            return val.desc;
-        }) | std::ranges::to<std::vector<AxisDesc>>();
-
-        return std::make_pair(desc, traits);
+    std::pair<std::vector<AxisDescMeta>, std::vector<Trait>> AttribRenderer::get_traits() {
+        return std::make_pair(descriptors, traits);
     }
         
     void AttribRenderer::clear_traits() {
