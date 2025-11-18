@@ -3,8 +3,10 @@
 #include <variant>
 #include <cstddef>
 #include <string>
+#include "shapes.h"
 
 constexpr float AXIS_LENGTH = 1.6f;
+constexpr float AXIS_WIDTH = 0.015f;
 
 namespace MVF {
     enum class TraitType {

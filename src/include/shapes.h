@@ -26,13 +26,11 @@ namespace MVF {
         Vector3f direction;
         float scale;
     };
-    
-    struct PointVertex {
-        Vector2f position;
-        Vector2f uv;
-    };
 #pragma pack(pop)
 
+    void add_rect(std::vector<Vector2f>& vertices, float x, float y, float w, float h);
+    void add_rect_outline(std::vector<Vector2f>& vertices, float x, float y, float w, float h);
+    
     struct ArrowMesh {
         std::vector<ArrowVertex> vertices;
         std::vector<uint32_t> indices;

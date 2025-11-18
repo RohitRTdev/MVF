@@ -14,7 +14,7 @@ class AttributePanel;
 namespace MVF {
     class RenderHandler : public Gtk::GLArea {
     public:
-        RenderHandler(Renderer* renderer);
+        RenderHandler(Renderer* renderer, bool has_depth_buffer = true);
         
     protected:
         Renderer* renderer;

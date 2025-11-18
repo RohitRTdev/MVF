@@ -82,9 +82,10 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
         },
         {
             .tooltip_text = "Show/hide plot",
+            .icon_filename = "assets/show.png",
             .handler = [this] {
                 attrib_handler.make_current();
-                attrib_renderer.enable_scatter_plot(show_plot);
+                attrib_renderer.enable_plot(show_plot);
                 attrib_handler.queue_render();
                 show_plot = !show_plot;
             }
@@ -205,6 +206,7 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
             field_panel.clear_traits();
         }
         attrib_panel.handle_changed_selection = false;
+        show_plot = true;
     });
     
     add_controller(mouse_click);

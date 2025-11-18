@@ -22,12 +22,12 @@ static std::pair<double, double> convert_to_ndc(double x, double y, size_t width
 }
 
 namespace MVF {
-    RenderHandler::RenderHandler(Renderer* renderer) : renderer(renderer) {
+    RenderHandler::RenderHandler(Renderer* renderer, bool has_depth_buffer) : renderer(renderer) {
         set_hexpand(true);
         set_vexpand(true);
 
         set_required_version(4, 6);
-        set_has_depth_buffer(true);
+        set_has_depth_buffer(has_depth_buffer);
         
         int major, minor;
         get_required_version(major, minor);
@@ -135,7 +135,7 @@ namespace MVF {
         add_controller(motion);
     }
 
-    AttribHandler::AttribHandler(AttribRenderer* renderer) : RenderHandler(renderer) {
+    AttribHandler::AttribHandler(AttribRenderer* renderer) : RenderHandler(renderer, false) {
         auto mouse_click = Gtk::GestureClick::create();
         mouse_click->set_button(GDK_BUTTON_PRIMARY);
         mouse_click->signal_pressed().connect(sigc::mem_fun(*this, &AttribHandler::on_mouse_click));

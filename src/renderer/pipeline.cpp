@@ -151,10 +151,6 @@ namespace MVF{
         glUniform1i(glGetUniformLocation(shader_program, "volume_tex"), 0);
     }
         
-    PointPipeline::PointPipeline() : Pipeline("shaders/point.vs", "shaders/point.fs", PipelineType::POINT) {
-        uColor = get_uniform_var("uColor");
-    }
-
     std::vector<Pipeline*> Pipeline::init_pipelines(bool is_spatial_pipeline) {
         std::vector<Pipeline*> pipelines;
         if (is_spatial_pipeline) {
@@ -165,7 +161,7 @@ namespace MVF{
 #endif
         }
         else {
-            pipelines = {new AxisPipeline(), new MarkerPipeline(), new PointPipeline()};
+            pipelines = {new AxisPipeline(), new MarkerPipeline()};
 #ifdef MVF_DEBUG
         std::cout << "Created attribute pipeline of size: " << pipelines.size() << std::endl;
 #endif

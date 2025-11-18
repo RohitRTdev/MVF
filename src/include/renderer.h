@@ -70,7 +70,7 @@ namespace MVF {
         void set_range_trait(float x_top, float y_top, float width, float height);
         void modify_range_trait(float x_right);
         void modify_range_trait(float x_end, float y_end);
-        void enable_scatter_plot(bool enable);
+        void enable_plot(bool enable);
         void clear_traits();
 
     private:
@@ -78,18 +78,22 @@ namespace MVF {
         PointMarker marker;
         GLuint vao_x_axis, vao_y_axis, vao_marker, vao_interval;
         GLuint vao_polyline, vao_polypoint, vao_scatterplot;
+        GLuint vao_distplotsolid, vao_distplotlines;
         GLuint vbo_x_axis, vbo_y_axis, vbo_marker, vbo_marker_pos, vbo_interval;
         GLuint vbo_polyline, vbo_polypoint, vbo_scatterplot;
+        GLuint vbo_distplotsolid, vbo_distplotlines;
         size_t num_interval_vertices = 0, num_range_tri_vertices = 0, num_range_pt_vertices = 0;
         std::shared_ptr<VolumeData> data;
         std::vector<AxisDescMeta> descriptors;
         std::vector<Trait> traits;
-        std::vector<PointVertex> scatter_plot;
-        bool is_scatter_plot_visible = false;
+        std::vector<Vector2f> scatter_plot, dist_plot_solid, dist_plot_lines;
+        bool is_plot_visible = false;
         void setup_buffers(); 
         void setup_traits();
         void generate_scatter_plot();
+        void generate_freq_distribution();
         void setup_plot();
+        void clear_plot();
 
     };
 }

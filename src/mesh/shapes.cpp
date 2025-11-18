@@ -7,6 +7,36 @@ constexpr uint8_t SEGMENTS = 20;
 const uint8_t GLYPH_SAMPLING = 1;
 
 namespace MVF {
+    void add_rect(std::vector<Vector2f>& vertices, float x, float y, float w, float h) {
+        // Triangle 1
+        vertices.push_back({x, y});
+        vertices.push_back({x + w, y});
+        vertices.push_back({x + w, y+h});
+
+        // Triangle 2
+        vertices.push_back({x, y});
+        vertices.push_back({x + w, y + h});
+        vertices.push_back({x, y + h});
+    }
+    
+    void add_rect_outline(std::vector<Vector2f>& vertices, float x, float y, float w, float h) {
+        // Line 1
+        vertices.push_back({x, y});
+        vertices.push_back({x + w, y});
+        
+        // Line 2 
+        vertices.push_back({x + w, y});
+        vertices.push_back({x + w, y + h});
+
+        // Line 3
+        vertices.push_back({x + w, y + h});
+        vertices.push_back({x, y + h});
+
+        // Line 4
+        vertices.push_back({x, y + h});
+        vertices.push_back({x, y});
+    }
+    
     ArrowMesh::ArrowMesh(float rad_cyl, float rad_cone, float len_cyl, float len_cone) {
         // Generate the cylinder
         for (int i = 0; i < SEGMENTS; i++) {
@@ -241,17 +271,6 @@ namespace MVF {
         }
     }
     
-    static void add_rect(std::vector<Vector2f>& vertices, float x, float y, float w, float h) {
-        // Triangle 1
-        vertices.push_back({x, y});
-        vertices.push_back({x + w, y});
-        vertices.push_back({x + w, y+h});
-
-        // Triangle 2
-        vertices.push_back({x, y});
-        vertices.push_back({x + w, y + h});
-        vertices.push_back({x, y+h});
-    }
     
     IntervalSelector::IntervalSelector(float x_left, float x_right, float center_y, 
         float line_thickness, float handle_width, float handle_height) {
