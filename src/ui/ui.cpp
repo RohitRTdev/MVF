@@ -79,7 +79,7 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
         }
     });
     
-    auto attrib_hbox = build_menu({
+    attrib_hbox = build_menu({
         {
             .tooltip_text = "Clear traits",
             .icon_filename = "assets/reset.png",
@@ -100,19 +100,35 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
                 attrib_panel.set_button_inactive();
                 trait_handler_pending = false;
             }
-        },
-        {
-            .tooltip_text = "Show/hide plot",
-            .icon_filename = "assets/show.png",
-            .handler = [this] {
-                attrib_handler.make_current();
-                attrib_renderer.enable_plot(show_plot);
-                attrib_handler.queue_render();
-                show_plot = !show_plot;
-            }
         }
     });
 
+    show_plot_button = build_button("Show plot", "assets/show.png", [this] {
+        if (disable_set_plot) {
+            return;
+        }
+        
+        attrib_handler.make_current();
+        attrib_renderer.enable_plot(true);
+        attrib_handler.queue_render();
+        set_plot(false);
+    });  
+
+    hide_plot_button = build_button("Hide plot", "assets/hide.png", [this] {
+        if (disable_set_plot) {
+            return;
+        }
+        
+        attrib_handler.make_current();
+        attrib_renderer.enable_plot(false);
+        attrib_handler.queue_render();
+        set_plot(true); 
+    });
+    
+    attrib_hbox->append(*show_plot_button);
+    attrib_hbox->append(*hide_plot_button);
+    set_plot(true);
+    
     auto field_hbox = build_menu({
         {
             .tooltip_text = "Reset camera",
@@ -209,9 +225,9 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
     });
 
     attrib_panel.apply_button.signal_clicked().connect([this] {
-        if (is_async_ui_state) {
+        if (is_async_ui_state || file_loader_conn.connected()) {
 #ifdef MVF_DEBUG
-            std::cout << "Distance field computation ongoing..." << std::endl;
+            std::cout << "Timer lock held..." << std::endl;
 #endif
             return;
         }
@@ -221,6 +237,7 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
         auto [comp, traits] = attrib_renderer.get_traits();
         enable_ui_async_state();
         field_panel.set_traits(comp, traits);
+        attrib_panel.comp_list.set_sensitive(false);
     });
 
     attrib_panel.comp_list.set_secondary_handler([this] {
@@ -237,18 +254,28 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
         else {
             field_panel.clear_traits();
         }
+
+        disable_set_plot = attrib_panel.comp_list.get_selected().size() == 0;
+
+        set_plot(true);
         attrib_panel.handle_changed_selection = false;
-        show_plot = true;
     });
     
     add_controller(mouse_click);
 
     signal_close_request().connect(sigc::mem_fun(*this, &MainWindow::on_window_close), false);
 }
+
+void MainWindow::set_plot(bool show) {
+    show_plot_button->set_visible(show);
+    hide_plot_button->set_visible(!show);
+    show_plot = show;
+}
     
 bool MainWindow::generic_async_handler() {
     if(!is_async_ui_state) {
         field_panel.complete_set_traits();
+        attrib_panel.comp_list.set_sensitive(true);
         return false;
     }
 
@@ -288,6 +315,18 @@ void MainWindow::toggle_attrib_space() {
     is_attrib_space_visible = !is_attrib_space_visible;
 }
 
+Gtk::Button* MainWindow::build_button(const std::string& tooltip_text, const std::string& icon_filename, std::function<void ()> handler) {
+    auto button = make_managed<Button>();
+    auto icon = make_managed<Image>(icon_filename);
+    button->set_child(*icon);
+    button->set_tooltip_text(tooltip_text);
+    button->set_has_frame(false);
+    
+    button->signal_clicked().connect(handler);
+
+    return button;
+}
+
 Gtk::Box* MainWindow::build_menu(const std::vector<ButtonDescriptor>& desc) {
     auto hbox = make_managed<Box>();
     hbox->set_spacing(5);
@@ -295,14 +334,7 @@ Gtk::Box* MainWindow::build_menu(const std::vector<ButtonDescriptor>& desc) {
     hbox->set_hexpand(true);
 
     for (auto& val: desc) {
-        auto button = make_managed<Button>();
-        auto icon = make_managed<Image>(val.icon_filename);
-        button->set_child(*icon);
-        button->set_tooltip_text(val.tooltip_text);
-        button->set_has_frame(false);
-        
-        button->signal_clicked().connect(val.handler);
-        hbox->append(*button);
+        hbox->append(*build_button(val.tooltip_text, val.icon_filename, val.handler));
     }
 
     return hbox;

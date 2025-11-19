@@ -409,8 +409,9 @@ namespace MVF {
         }
 
         auto& desc = descriptors[id];
-        auto u_f = 0.5 * ((desc.max_val + desc.min_val) + t * (desc.max_val - desc.min_val));
+        auto u_norm = t / (AXIS_LENGTH / 2);
+        auto u_f = 0.5 * ((desc.max_val + desc.min_val) + u_norm * (desc.max_val - desc.min_val));
     
-        return u_f; 
+        return u_f;
     }
 }

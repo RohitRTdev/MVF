@@ -38,6 +38,8 @@ private:
     void disable_ui_async_state();
     void complete_async_state();
     Gtk::Box* build_menu(const std::vector<ButtonDescriptor>& desc);
+    Gtk::Button* build_button(const std::string& tooltip_text, const std::string& icon_filename, std::function<void ()> handler);
+    void set_plot(bool show);
 
     bool is_attrib_space_visible = false;
     bool is_feature_space_visible = true;
@@ -47,6 +49,7 @@ private:
     bool clear_handler_pending = false;
     bool show_plot = true;
     bool is_async_ui_state = false;
+    bool disable_set_plot = true;
     float async_progress = 0;
 
     sigc::connection file_loader_conn;
@@ -59,9 +62,11 @@ private:
     Gtk::Box m_hbox{Gtk::Orientation::HORIZONTAL};
     Gtk::Box m_uibox{Gtk::Orientation::VERTICAL};
     Gtk::Paned pane;
+    Gtk::Button *show_plot_button, *hide_plot_button;
 
     Gtk::Box spatial_box{Gtk::Orientation::VERTICAL}, attrib_box{Gtk::Orientation::VERTICAL}, field_box{Gtk::Orientation::VERTICAL};
-    
+    Gtk::Box* attrib_hbox;
+
     MVF::SpatialHandler spatial_handler, field_handler;
     MVF::AttribHandler attrib_handler;
     MVF::SpatialRenderer spatial_renderer;

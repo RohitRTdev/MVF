@@ -78,7 +78,7 @@ namespace MVF {
         float max_dist = 0;
         for (int i = 0; i < grid_size; i++) {
             float min_dist = INFINITY;
-            if (stop_requested.load(std::memory_order_acquire)) {
+            if (stop_requested.load(std::memory_order_relaxed)) {
                 compute_passed = false;
                 return;
             }
@@ -100,6 +100,7 @@ namespace MVF {
                         auto& tr_pt = std::get<Point>(trait.data);
                         
                         // Calculate euclidean dist
+                        // We won't take the square root, as we just need a varying field
                         if (attrib_comps.size() == 1) {
                             dist = (tr_pt.x - pt[0]) * (tr_pt.x - pt[0]);
                         } 
@@ -116,7 +117,8 @@ namespace MVF {
                                 dist = 0;
                             }
                             else {
-                                dist = std::min(std::abs(tr_int.left - pt[0]), std::abs(tr_int.right - pt[0]));
+                                dist = std::min(std::abs(tr_int.left - pt[0]), std::abs(tr_int.right - pt[0])) * 
+                                std::min(std::abs(tr_int.left - pt[0]), std::abs(tr_int.right - pt[0]));
                             }
                         }
                         else {
@@ -125,7 +127,7 @@ namespace MVF {
                             // the distance to the midpoint of the polygonal trait
                             auto& tr_poly = std::get<Polygon>(std::get<Range>(trait.data).range);
                             if (pt[0] >= tr_poly.x_top && pt[0] <= tr_poly.x_top + tr_poly.width 
-                            && pt[1] >= tr_poly.y_top && pt[1] >= tr_poly.y_top + tr_poly.height) {
+                            && pt[1] >= tr_poly.y_top && pt[1] <= tr_poly.y_top + tr_poly.height) {
                                 dist = 0;
                             }
                             else {
@@ -207,13 +209,21 @@ namespace MVF {
                 case TraitType::RANGE: {
                     if (std::get<Range>(trait.data).type == RangeType::INTERVAL) {
                         auto& tr_int = std::get<Interval>(std::get<Range>(trait.data).range);
-                        tr_int.left = get_pt_norm(tr_int.left, 0);
-                        tr_int.right = get_pt_norm(tr_int.right, 0);
+                        auto left = get_pt_norm(tr_int.left, 0);
+                        auto right = get_pt_norm(tr_int.right, 0);
+                        tr_int.left = std::min(left, right);
+                        tr_int.right = std::max(left, right);
                     }
                     else {
                         auto& tr_poly = std::get<Polygon>(std::get<Range>(trait.data).range);
-                        tr_poly.x_top = get_pt_norm(tr_poly.x_top, 0);
-                        tr_poly.y_top = get_pt_norm(tr_poly.y_top, 0);
+                        auto x_top = get_pt_norm(tr_poly.x_top, 0);
+                        auto y_top = get_pt_norm(tr_poly.y_top, 1);
+
+                        // Our anchor point for the range would be the bottom left corner of the square
+                        tr_poly.x_top = std::min(x_top, x_top + tr_poly.width);
+                        tr_poly.y_top = std::min(y_top, y_top + tr_poly.height);
+                        tr_poly.width = std::abs(tr_poly.width);
+                        tr_poly.height = std::abs(tr_poly.height);
                     }
                 }
             }
@@ -229,7 +239,7 @@ namespace MVF {
     }
 
     void FieldEntity::cancel_dist_computation() {
-       stop_requested.store(true, std::memory_order_acquire);
+       stop_requested.store(true, std::memory_order_release);
        complete_set_traits();
        compute_passed = true;
     }

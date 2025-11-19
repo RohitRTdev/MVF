@@ -155,7 +155,7 @@ namespace MVF {
             auto x_f = static_cast<AttribRenderer*>(this->renderer)->get_field_point(x_ndc, 0);
             std::string text = std::format("{}={:.2f}", field_comps[0], x_f);
             if (field_comps.size() == 2) {
-                auto y_f = static_cast<AttribRenderer*>(this->renderer)->get_field_point(x_ndc, 1);
+                auto y_f = static_cast<AttribRenderer*>(this->renderer)->get_field_point(y_ndc, 1);
                 text.append(std::format("\n{}={:.2f}", field_comps[1], y_f));
             }
             this->mouse_overlay.show_at(static_cast<int>(x), static_cast<int>(y), text);
