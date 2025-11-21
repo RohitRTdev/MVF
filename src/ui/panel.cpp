@@ -298,5 +298,7 @@ void FieldPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     handler->make_current();
     field_renderer->setup_scene(data);
     field_renderer->entity.clear_traits();
+    iso_slider.set_sensitive(false);
+    rep_menu.set_sensitive(false);
     handler->queue_render();
 }

@@ -149,6 +149,17 @@ namespace MVF {
         // Normalize the field
         field = field | std::views::transform([max_dist] (float val) { return val / max_dist;}) | std::ranges::to<std::vector<float>>();
 
+#ifdef MVF_DEBUG
+        size_t zero_count = 0;
+        for (auto& val: field) {
+            if (val >= 0 && val <= 0.05) {
+                zero_count++;
+            }
+        }
+
+        std::cout << "Zero count: " << zero_count << std::endl;
+#endif
+
         set_draw_mode = true;
     }
 
@@ -284,7 +295,7 @@ namespace MVF {
 		Matrix4f mp = SpatialRenderer::entity.world * SpatialRenderer::entity.scale_transform * SpatialRenderer::entity.init_transform;
 		auto light_position = light.get_position();
 		auto camera_position = camera.get_position();
-  
+ 
         auto pipeline = static_cast<IsoPipeline*>(pipelines[static_cast<int>(PipelineType::ISO)]);
         glUseProgram(pipeline->shader_program); 
 		glUniformMatrix4fv(pipeline->uM, 1, GL_TRUE, &mp.m[0][0]);

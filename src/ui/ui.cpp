@@ -431,6 +431,8 @@ bool MainWindow::file_load_handler() {
         attrib_panel.load_model(loader->data);
         trait_handler_pending = false;
         clear_handler_pending = false;
+        disable_set_plot = true;
+        set_plot(true);
 
         return false;
     }
