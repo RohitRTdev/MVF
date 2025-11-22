@@ -29,7 +29,11 @@ private:
 
     MVF::SpatialHandler* handler;
     Gtk::ComboBoxText rep_menu;
+    Gtk::Frame slice_frame;
+    Slider slice_slider;
     Selection selected_mode;
+    int selected_axis = 2;
+    float slice_pos = 0;
 };
 
 class AttributePanel : public MVFPanel {
@@ -77,5 +81,5 @@ private:
 
     MVF::SpatialHandler* handler;
     Gtk::ComboBoxText rep_menu;
-    Gtk::Scale iso_slider;
+    Slider iso_slider;
 };

@@ -42,3 +42,8 @@ private:
     
     void on_button_clicked();
 };
+
+class Slider : public Gtk::Scale {
+public:
+    Slider(std::function<void()> handler);
+};

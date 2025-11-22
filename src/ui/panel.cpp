@@ -5,7 +5,12 @@
 
 using namespace Gtk;
 
-SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler) {
+SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), slice_slider([this] {
+    this->handler->make_current();
+    static_cast<MVF::SpatialRenderer*>(this->handler->renderer)->entity.set_slice_position(slice_slider.get_value());
+    slice_pos = slice_slider.get_value();
+    this->handler->queue_render();
+}) {
     set_label("Spatial panel");
 
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
@@ -28,7 +33,10 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler) {
             for (auto& [key, _]: data->scalars) {
                 keys.push_back(key);
             }
-            if (keys.size() >= 3) {
+            if (keys.size() == 2) {
+                spatial_renderer->entity.set_vector_mode(keys[0], keys[1]);
+            }
+            else {
                 spatial_renderer->entity.set_vector_mode(keys[0], keys[1], keys[2]);
             }
             this->handler->queue_render();
@@ -38,7 +46,9 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler) {
             this->handler->make_current();
             std::string key;
             for (auto& [k,_]: data->scalars) { key = k; break; }
-            spatial_renderer->entity.set_scalar_slice(key, 2);
+            spatial_renderer->entity.set_scalar_slice(key, selected_axis);
+            spatial_renderer->entity.set_slice_position(slice_pos);
+            slice_frame.set_visible(true);
             this->handler->queue_render();
             selected_mode = Selection::SLICE;
         }
@@ -56,16 +66,65 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler) {
             this->handler->queue_render();
             selected_mode = Selection::NONE;
         }
+
+        if (text != "Slice") {
+            slice_frame.set_visible(false);
+        }
     });
     rep_box->set_spacing(5);
     rep_box->set_margin(5);
     rep_box->append(*rep_label);
     rep_box->append(rep_menu);
+
+    // Create controls for Slice representation
+    slice_frame = Frame("Slice controls");
+    auto radio_vbox = make_managed<Box>(Gtk::Orientation::VERTICAL);
+    auto radio_label = make_managed<Label>("Normal to:");
+    auto radio_box = make_managed<Box>();
+    radio_box->set_halign(Gtk::Align::CENTER);
+    auto r1 = make_managed<CheckButton>("X");
+    auto r2 = make_managed<CheckButton>("Y");
+    auto r3 = make_managed<CheckButton>("Z");
+    r2->set_group(*r1);
+    r3->set_group(*r1);
+    r3->set_active();
     
+    for (auto* btn : {r1, r2, r3}) {
+        btn->signal_toggled().connect([this, btn] {
+            if (btn->get_active()) {
+                if(btn->get_label() == "X") {
+                    selected_axis = 0;
+                }
+                else if (btn->get_label() == "Y") {
+                    selected_axis = 1;
+                }
+                else {
+                    selected_axis = 2;
+                }
+
+                this->handler->make_current();
+                static_cast<MVF::SpatialRenderer*>(this->handler->renderer)->entity.set_slice_axis(selected_axis);
+                this->handler->queue_render();
+            }
+        });
+    }
+
+    radio_box->append(*r1);
+    radio_box->append(*r2);
+    radio_box->append(*r3);
+    
+    radio_vbox->append(*radio_label);
+    radio_vbox->append(*radio_box);
+    radio_vbox->append(slice_slider);
+    
+    slice_frame.set_child(*radio_vbox);
+    slice_frame.set_visible(false);
+
     auto spacer = make_managed<Box>(Orientation::VERTICAL);
     spacer->set_vexpand(true);
     
     vbox->append(*rep_box);
+    vbox->append(slice_frame);
     vbox->append(*spacer);
 
     set_child(*vbox);
@@ -81,7 +140,7 @@ void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
         }
     }
 
-    if (data->scalars.size() >= 3) {
+    if (data->scalars.size() >= 2) {
         rep_menu.append("Volume");
     }
     if (data->scalars.size() >= 1) {
@@ -90,6 +149,10 @@ void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     }
     rep_menu.set_active(0);
     rep_menu.set_sensitive(true);
+
+    slice_pos = 0;
+    slice_slider.set_value(0);
+    slice_frame.set_visible(false);
 
     auto spatial_renderer = static_cast<MVF::SpatialRenderer*>(handler->renderer);
     handler->make_current();
@@ -253,7 +316,10 @@ void FieldPanel::disable_panel() {
     iso_slider.set_sensitive(false);
 }
 
-FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler) {
+FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler), iso_slider([this]() {
+    static_cast<MVF::FieldRenderer*>(this->handler->renderer)->entity.set_isovalue(iso_slider.get_value());
+    this->handler->queue_render();
+}) {
     set_label("Feature panel");
 
     rep_menu.append("Isosurface");
@@ -269,26 +335,15 @@ FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler) {
     rep_box->append(*rep_label);
     rep_box->append(rep_menu);
     
-    // Create a horizontal slider
-    auto adjustment = Gtk::Adjustment::create(0.0, 0.0, 1.0, 0.01, 0.1);
-
-    iso_slider.set_adjustment(adjustment);
-    iso_slider.set_value_pos(Gtk::PositionType::LEFT);
-    iso_slider.set_digits(2);
-    iso_slider.set_draw_value(true); 
-    iso_slider.set_sensitive(false);
-
-    iso_slider.signal_value_changed().connect([this]() {
-        static_cast<MVF::FieldRenderer*>(this->handler->renderer)->entity.set_isovalue(iso_slider.get_value());
-        this->handler->queue_render();
-    });
-
     auto spacer = make_managed<Box>(Orientation::VERTICAL);
     spacer->set_vexpand(true);
     
     vbox->append(*rep_box);
     vbox->append(iso_slider);
     vbox->append(*spacer);
+
+    iso_slider.set_sensitive(false);
+
     set_child(*vbox);
 }
 

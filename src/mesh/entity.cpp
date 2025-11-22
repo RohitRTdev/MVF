@@ -77,7 +77,15 @@ namespace MVF {
 
         vec_buffer.is_active = false;
     }
-    
+   
+    void VolumeEntity::set_vector_mode(const std::string& field1, const std::string& field2) {
+        type.mode = EntityMode::VECTOR_GLYPH;
+        type.data = VectorGlyphDesc{field1, field2};
+        
+        destroy_buffers(false);
+        create_buffers(); 
+    } 
+
     void VolumeEntity::set_vector_mode(const std::string& field1, const std::string& field2, const std::string& field3) { 
         type.mode = EntityMode::VECTOR_GLYPH;
         type.data = VectorGlyphDesc{field1, field2, field3};

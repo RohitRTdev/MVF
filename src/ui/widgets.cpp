@@ -175,3 +175,15 @@ void MultiSelectCombo::update_list(const std::vector<std::string>& options) {
         check_buttons.push_back(check_button);
     }
 }
+
+Slider::Slider(std::function<void()> handler) {
+    auto adjustment = Gtk::Adjustment::create(0.0, 0.0, 1.0, 0.01, 0.1);
+
+    set_adjustment(adjustment);
+    set_value_pos(Gtk::PositionType::LEFT);
+    set_digits(2);
+    set_draw_value(true); 
+
+    signal_value_changed().connect(handler);
+}
+
