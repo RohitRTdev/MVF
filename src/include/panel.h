@@ -31,9 +31,13 @@ private:
     Gtk::ComboBoxText rep_menu;
     Gtk::Frame slice_frame;
     Slider slice_slider;
+    MultiSelectCombo comp_list;
     Selection selected_mode;
     int selected_axis = 2;
     float slice_pos = 0;
+    std::vector<std::string> selected_comps;
+
+    void on_selection();
 };
 
 class AttributePanel : public MVFPanel {

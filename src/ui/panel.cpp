@@ -10,7 +10,7 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
     static_cast<MVF::SpatialRenderer*>(this->handler->renderer)->entity.set_slice_position(slice_slider.get_value());
     slice_pos = slice_slider.get_value();
     this->handler->queue_render();
-}) {
+}), comp_list({}, [this]() { on_selection(); }) {
     set_label("Spatial panel");
 
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
@@ -19,6 +19,7 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
     rep_menu.append("None");
     rep_menu.set_active(0);
     rep_menu.set_sensitive(false);
+    comp_list.set_sensitive(false);
     rep_menu.signal_changed().connect([this]() {
         if (!data) {
             return;
@@ -29,24 +30,19 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
         auto spatial_renderer = static_cast<MVF::SpatialRenderer*>(this->handler->renderer);
         if (text == "Volume" && selected_mode != Selection::VOLUME) {
             this->handler->make_current();
-            std::vector<std::string> keys;
-            for (auto& [key, _]: data->scalars) {
-                keys.push_back(key);
-            }
-            if (keys.size() == 2) {
-                spatial_renderer->entity.set_vector_mode(keys[0], keys[1]);
+            if (selected_comps.size() == 2) {
+                spatial_renderer->entity.set_vector_mode(selected_comps[0], selected_comps[1]);
             }
             else {
-                spatial_renderer->entity.set_vector_mode(keys[0], keys[1], keys[2]);
+                spatial_renderer->entity.set_vector_mode(selected_comps[0], selected_comps[1], selected_comps[2]);
             }
+
             this->handler->queue_render();
             selected_mode = Selection::VOLUME;
         }
         else if (text == "Slice" && selected_mode != Selection::SLICE) {
             this->handler->make_current();
-            std::string key;
-            for (auto& [k,_]: data->scalars) { key = k; break; }
-            spatial_renderer->entity.set_scalar_slice(key, selected_axis);
+            spatial_renderer->entity.set_scalar_slice(selected_comps[0], selected_axis);
             spatial_renderer->entity.set_slice_position(slice_pos);
             slice_frame.set_visible(true);
             this->handler->queue_render();
@@ -54,9 +50,7 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
         }
         else if (text == "DVR" && selected_mode != Selection::DVR) {
             this->handler->make_current();
-            std::string key;
-            for (auto& [k,_]: data->scalars) { key = k; break; }
-            spatial_renderer->entity.set_dvr(key);
+            spatial_renderer->entity.set_dvr(selected_comps[0]);
             this->handler->queue_render();
             selected_mode = Selection::DVR;
         }
@@ -122,7 +116,9 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
 
     auto spacer = make_managed<Box>(Orientation::VERTICAL);
     spacer->set_vexpand(true);
-    
+   
+    vbox->set_spacing(5);
+    vbox->append(comp_list);
     vbox->append(*rep_box);
     vbox->append(slice_frame);
     vbox->append(*spacer);
@@ -131,8 +127,54 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
     selected_mode = Selection::NONE;
 }
 
+void SpatialPanel::on_selection() {
+    auto comps = comp_list.get_selected();
+
+    // If same as previous, don't do anything
+    if (comps == selected_comps) {
+        return;
+    }
+
+    if (comps.size() > 3) {
+        MVF::app_warn("Please set 3 or less components");
+        comp_list.set_active_mask(selected_comps);
+        return;
+    }
+
+    selected_comps = comps;
+    
+    // Clear all but first entry (None) to avoid duplicates
+    while (rep_menu.get_model()->children().size() > 1) {
+        for (int i = rep_menu.get_model()->children().size() - 1; i >= 1; --i) {
+            rep_menu.remove_text(i);
+        }
+    }
+    
+    if (comps.size() > 1) {
+        rep_menu.append("Volume");
+    }
+    else if (comps.size() == 1) {
+        rep_menu.append("Slice");
+        rep_menu.append("DVR");
+    }
+    rep_menu.set_active(0);
+    selected_mode = Selection::NONE;
+    
+    handler->make_current();
+    static_cast<MVF::SpatialRenderer*>(handler->renderer)->entity.set_box_mode();
+    this->handler->queue_render();
+}
+
 void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     this->data = data;
+    
+    selected_comps.clear();
+    auto field_comps = this->data->scalars | std::views::transform([] (auto& field) {
+        return field.first;
+    }) | std::ranges::to<std::vector<std::string>>();
+
+    comp_list.update_list(field_comps);
+
     // Clear all but first entry (None) to avoid duplicates
     while (rep_menu.get_model()->children().size() > 1) {
         for (int i = rep_menu.get_model()->children().size() - 1; i >= 1; --i) {
@@ -140,15 +182,9 @@ void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
         }
     }
 
-    if (data->scalars.size() >= 2) {
-        rep_menu.append("Volume");
-    }
-    if (data->scalars.size() >= 1) {
-        rep_menu.append("Slice");
-        rep_menu.append("DVR");
-    }
     rep_menu.set_active(0);
     rep_menu.set_sensitive(true);
+    comp_list.set_sensitive(true);
 
     slice_pos = 0;
     slice_slider.set_value(0);
