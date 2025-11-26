@@ -14,7 +14,8 @@ namespace MVF {
 
         // Attribute domain
         AXIS = 0,
-        MARKER
+        MARKER,
+        COLOR
     };
 
     struct Pipeline {
@@ -70,7 +71,7 @@ namespace MVF {
     };
     
     struct MarkerPipeline: Pipeline {
-        GLuint uColor;
+        GLuint uAlpha;
         MarkerPipeline();    
     };
 
@@ -80,6 +81,12 @@ namespace MVF {
         GLuint uLimits, uSpacing;
         GLuint uSteps;
         GLuint uLightPos, uViewPos;
+        GLuint uApplyColor;
         IsoPipeline();    
+    };
+    
+    struct ColorPipeline: Pipeline {
+        GLuint uAlpha;
+        ColorPipeline();    
     };
 }

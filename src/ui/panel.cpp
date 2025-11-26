@@ -182,7 +182,6 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler), 
         attrib_handler->set_point_trait_mode(text == "Point");
     });  
 
-
     comp_list.set_sensitive(false);
     trait_sel.set_sensitive(false);
     apply_button.set_sensitive(false);
@@ -289,16 +288,14 @@ void FieldPanel::set_traits(const std::vector<MVF::AxisDescMeta>& attrib_comps, 
 }
     
 void FieldPanel::complete_set_traits() {
-    rep_menu.set_sensitive(true);
-    iso_slider.set_sensitive(true);
+    enable_panel();
     auto field_handler = static_cast<MVF::FieldRenderer*>(handler->renderer); 
     field_handler->entity.complete_set_traits();
     handler->queue_render();
 }
 
 void FieldPanel::clear_traits() {
-    rep_menu.set_sensitive(false);
-    iso_slider.set_sensitive(false);
+    disable_panel();
 
     handler->make_current();
     auto field_handler = static_cast<MVF::FieldRenderer*>(handler->renderer); 
@@ -309,11 +306,13 @@ void FieldPanel::clear_traits() {
 void FieldPanel::enable_panel() {
     rep_menu.set_sensitive(true);
     iso_slider.set_sensitive(true);
+    apply_color.set_sensitive(true);
 }
 
 void FieldPanel::disable_panel() {
     rep_menu.set_sensitive(false);
     iso_slider.set_sensitive(false);
+    apply_color.set_sensitive(false);
 }
 
 FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler), iso_slider([this]() {
@@ -325,7 +324,6 @@ FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler), iso_sli
     rep_menu.append("Isosurface");
     rep_menu.append("DVR");
     rep_menu.set_active(0);
-    rep_menu.set_sensitive(false);
 
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
     auto rep_box = make_managed<Box>();
@@ -333,17 +331,24 @@ FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler), iso_sli
     rep_box->set_spacing(5);
     rep_box->set_margin(5);
     rep_box->append(*rep_label);
-    rep_box->append(rep_menu);
-    
+    rep_box->append(rep_menu);    
+   
+    apply_color = CheckButton("Apply colormap");
+
     auto spacer = make_managed<Box>(Orientation::VERTICAL);
     spacer->set_vexpand(true);
     
     vbox->append(*rep_box);
     vbox->append(iso_slider);
+    vbox->append(apply_color);
     vbox->append(*spacer);
 
-    iso_slider.set_sensitive(false);
+    apply_color.signal_toggled().connect([this] {
+        static_cast<MVF::FieldRenderer*>(this->handler->renderer)->entity.set_apply_color(apply_color.get_active());
+        this->handler->queue_render();
+    });
 
+    disable_panel();
     set_child(*vbox);
 }
 
@@ -353,7 +358,6 @@ void FieldPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     handler->make_current();
     field_renderer->setup_scene(data);
     field_renderer->entity.clear_traits();
-    iso_slider.set_sensitive(false);
-    rep_menu.set_sensitive(false);
+    disable_panel();
     handler->queue_render();
 }

@@ -133,8 +133,8 @@ namespace MVF{
         uColor = get_uniform_var("uColor");
     }
     
-    MarkerPipeline::MarkerPipeline() : Pipeline("shaders/marker.vs", "shaders/solid_color.fs", PipelineType::MARKER) {
-        uColor = get_uniform_var("uColor");
+    MarkerPipeline::MarkerPipeline() : Pipeline("shaders/marker.vs", "shaders/color2d.fs", PipelineType::MARKER) {
+        uAlpha = get_uniform_var("uAlpha");
     }
     
     IsoPipeline::IsoPipeline() : Pipeline("shaders/iso.vs", "shaders/iso.gs", "shaders/phong_shading.fs", PipelineType::ISO) {
@@ -147,9 +147,15 @@ namespace MVF{
         uSteps = get_uniform_var("uSteps");
         uLightPos = get_uniform_var("uLightPos");
         uViewPos = get_uniform_var("uViewPos");
+        uApplyColor = get_uniform_var("uApplyColor");
         
         glUniform1i(glGetUniformLocation(shader_program, "volume_tex"), 0);
+        glUniform1i(glGetUniformLocation(shader_program, "color_tex"), 1);
     }
+        
+    ColorPipeline::ColorPipeline() : Pipeline("shaders/color2d.vs", "shaders/color2d.fs", PipelineType::COLOR) { 
+        uAlpha = get_uniform_var("uAlpha");
+    } 
         
     std::vector<Pipeline*> Pipeline::init_pipelines(bool is_spatial_pipeline) {
         std::vector<Pipeline*> pipelines;
@@ -161,7 +167,7 @@ namespace MVF{
 #endif
         }
         else {
-            pipelines = {new AxisPipeline(), new MarkerPipeline()};
+            pipelines = {new AxisPipeline(), new MarkerPipeline(), new ColorPipeline()};
 #ifdef MVF_DEBUG
         std::cout << "Created attribute pipeline of size: " << pipelines.size() << std::endl;
 #endif

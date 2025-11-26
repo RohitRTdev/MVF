@@ -88,12 +88,14 @@ namespace MVF {
         std::vector<Trait> traits;
         std::vector<Vector2f> scatter_plot, dist_plot_solid, dist_plot_lines;
         bool is_plot_visible = false;
+        size_t last_chosen_id = 0;
+
         void setup_buffers(); 
         void setup_traits();
         void generate_scatter_plot();
         void generate_freq_distribution();
         void setup_plot();
         void clear_plot();
-
+        size_t get_color_id();
     };
 }

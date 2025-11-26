@@ -164,7 +164,6 @@ namespace MVF {
 
     class FieldEntity : Entity {
     public:
-
         FieldEntity();
         void init(VolumeEntity* geometry_entity);
         void set_traits(const std::vector<AxisDescMeta>& attrib_comps, const std::vector<Trait>& traits);
@@ -172,17 +171,19 @@ namespace MVF {
         void cancel_dist_computation();
         void clear_traits();
         void set_isovalue(float value);
+        void set_apply_color(bool apply_color);
         friend FieldRenderer;
     
     private:
-       
+    
         GLuint vao, vbo;
-        GLuint tex3d;
+        GLuint tex3d, tex3d_col;
         Vector3f steps;
         const size_t res_x = 100, res_y = 100, res_z = 100;
         float iso_value = 0;
         std::vector<Vertex> points;
         std::vector<float> field;
+        std::vector<Vector3f> color_field;
         std::vector<AxisDescMeta> attrib_comps;
         std::vector<Trait> traits;
         VolumeEntity* geometry_entity;
@@ -190,6 +191,7 @@ namespace MVF {
         std::thread worker_thread; 
         bool set_draw_mode = false;
         bool compute_passed = true; 
+        bool is_apply_color = false;
         std::atomic<bool> stop_requested = false; 
 
         void create_voxel_grid();

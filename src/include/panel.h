@@ -82,4 +82,5 @@ private:
     MVF::SpatialHandler* handler;
     Gtk::ComboBoxText rep_menu;
     Slider iso_slider;
+    Gtk::CheckButton apply_color;
 };

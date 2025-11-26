@@ -7,18 +7,13 @@
 
 constexpr float AXIS_LENGTH = 1.6f;
 constexpr float AXIS_WIDTH = 0.015f;
+constexpr size_t MAX_COLORS = 4;
 
 namespace MVF {
     enum class TraitType {
         POINT,
         RANGE
     };
-
-#pragma pack(push, 1)
-    struct Point {
-        float x, y;
-    };
-#pragma pack(pop)
 
     struct Interval {
         float left, right;
@@ -44,6 +39,7 @@ namespace MVF {
     struct Trait {
         TraitType type;
         std::variant<Point, Range> data;
+        size_t color_id;
     };
 
     struct AxisDesc {
@@ -56,4 +52,6 @@ namespace MVF {
         AxisDesc desc;
         float min_val, max_val;
     };
+
+    extern const Vector3f global_color_pallete[MAX_COLORS];
 }
