@@ -107,17 +107,13 @@ namespace MVF {
                 pt[dim] = fld[i];
             }
 
-            // Calculate the min distance of the traits to this point
-            // For now, we do this naively
+            // Calculate the min distance of the traits to this point (naive)
             Trait* sel_trait = nullptr;
             for (auto& trait: traits) {
                 float dist = INFINITY;
                 switch(trait.type) {
                     case TraitType::POINT: {
                         auto& tr_pt = std::get<Point>(trait.data);
-                        
-                        // Calculate euclidean dist
-                        // We won't take the square root, as we just need a varying field
                         if (attrib_comps.size() == 1) {
                             dist = (tr_pt.x - pt[0]) * (tr_pt.x - pt[0]);
                         } 
@@ -188,15 +184,22 @@ namespace MVF {
             color_field[i] = global_color_pallete[sel_trait->color_id];
         }
 
+        //// Normalize once (guard against divide by zero)
+        //if (max_dist > 0.0f) {
+        //    field = field | std::views::transform([max_dist] (float val) { return val / max_dist; }) | std::ranges::to<std::vector<float>>();
+        //} else {
+        //    field = field | std::views::transform([] (float) { return 0.0f; }) | std::ranges::to<std::vector<float>>();
+        //}
+
         // Normalize the field
-        field = field | 
-        std::views::transform([max_dist] (auto& pt) {
+        field = field |
+            std::views::transform([max_dist](auto& pt) {
             return pt / max_dist;
-        }) | std::ranges::to<std::vector<float>>();
+                }) | std::ranges::to<std::vector<float>>();
 
 #ifdef MVF_DEBUG
         size_t zero_count = 0;
-        for (auto& val: field) {
+        for (auto& val : field) {
             if (val >= 0 && val <= 0.05) {
                 zero_count++;
             }
@@ -205,7 +208,6 @@ namespace MVF {
         std::cout << "Zero count: " << zero_count << std::endl;
 #endif
 
-        field = field | std::views::transform([max_dist] (float val) { return max_dist > 0 ? (val / max_dist) : 0.0f;}) | std::ranges::to<std::vector<float>>();
         set_draw_mode = true;
     }
 
