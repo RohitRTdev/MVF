@@ -11,6 +11,7 @@ uniform mat4 uM;
 
 layout(location = 0) out vec3 a_normal;
 layout(location = 1) out vec3 a_frag_pos;
+layout(location = 2) out vec3 a_color;
 
 void main() {
     vec3 Z = normalize(inst_direction);
@@ -46,4 +47,5 @@ void main() {
     a_normal = mat3(uM * model_inst) * normal; 
 
     gl_Position = uMVP * model_inst * vec4(position, 1.0);
+    a_color = vec3(1.0, 0.0, 0.0);
 }

@@ -9,6 +9,20 @@
 #include <pango/pangocairo.h>
 
 namespace MVF {
+    const Vector3f global_color_pallete[MAX_COLORS] = {
+        Vector3f(1.0, 0.0, 0.0),
+        Vector3f(0.0, 0.0, 1.0),
+        Vector3f(0.0, 1.0, 0.0),
+        Vector3f(1.0, 1.0, 0.0)
+    };
+
+    size_t AttribRenderer::get_color_id() {
+        auto id = last_chosen_id;
+        last_chosen_id = (last_chosen_id + 1) % MAX_COLORS;
+        
+        return id;
+    }
+
     void AttribRenderer::init(int width, int height) {
         Renderer::init(width, height);
         glDisable(GL_DEPTH_TEST); 
@@ -73,23 +87,36 @@ namespace MVF {
         
         glBindBuffer(GL_ARRAY_BUFFER, vbo_marker_pos);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), 0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Point), 0);
         glVertexAttribDivisor(1, 1);
+        
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)sizeof(Vector2f));
+        glVertexAttribDivisor(2, 1);
         
         glBindVertexArray(vao_interval);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_interval);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), (void*)0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)0);
+        
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)sizeof(Vector2f));
         
         glBindVertexArray(vao_polyline);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_polyline);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), (void*)0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)0);
+        
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)sizeof(Vector2f));
         
         glBindVertexArray(vao_polypoint);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_polypoint);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), (void*)0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)0);
+        
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)sizeof(Vector2f));
         
         glBindVertexArray(vao_scatterplot);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_scatterplot);
@@ -192,7 +219,8 @@ namespace MVF {
                 | std::views::join | std::ranges::to<std::vector>();
                 num_interval_vertices = vertices_interval.size();
                 glBindBuffer(GL_ARRAY_BUFFER, vbo_interval);
-                glBufferData(GL_ARRAY_BUFFER, vertices_interval.size() * sizeof(Vector2f), vertices_interval.data(), GL_DYNAMIC_DRAW);
+                glBufferData(GL_ARRAY_BUFFER, vertices_interval.size() * sizeof(Point), vertices_interval.data(), GL_DYNAMIC_DRAW);
+
                 break;
             }
             case 2: {
@@ -205,9 +233,11 @@ namespace MVF {
                 }) | std::views::transform([] (auto& trait) {return std::get<Polygon>(std::get<Range>(trait.data).range).mesh.tri_vertices;})
                 | std::views::join | std::ranges::to<std::vector>();
                 glBindBuffer(GL_ARRAY_BUFFER, vbo_polyline);
-                glBufferData(GL_ARRAY_BUFFER, tri_vertices.size() * sizeof(Vector2f), tri_vertices.data(), GL_DYNAMIC_DRAW);
+                glBufferData(GL_ARRAY_BUFFER, tri_vertices.size() * sizeof(Point), tri_vertices.data(), GL_DYNAMIC_DRAW);
+
                 glBindBuffer(GL_ARRAY_BUFFER, vbo_polypoint);
-                glBufferData(GL_ARRAY_BUFFER, pt_vertices.size() * sizeof(Vector2f), pt_vertices.data(), GL_DYNAMIC_DRAW);
+                glBufferData(GL_ARRAY_BUFFER, pt_vertices.size() * sizeof(Point), pt_vertices.data(), GL_DYNAMIC_DRAW);
+
                 num_range_tri_vertices = tri_vertices.size();
                 num_range_pt_vertices = pt_vertices.size();
                 break;
@@ -474,6 +504,42 @@ namespace MVF {
                 line_color = Vector4f(1.0f, 0.2f, 0, 1.0f); glUniform4fv(pipeline_axis->uColor, 1, (float*)&line_color); glBindVertexArray(vao_polypoint); glDrawArrays(GL_POINTS, 0, num_range_pt_vertices);
             }
         }
+
+        // Draw the traits
+        auto point_traits = std::ranges::distance(traits | std::views::filter([] (auto& trait) {
+            return trait.type == TraitType::POINT;
+        }));
+
+        // Point traits will be drawn on bottom layer
+        if (point_traits) {
+            auto pipeline_marker = reinterpret_cast<MarkerPipeline*>(pipelines[static_cast<int>(PipelineType::MARKER)]);
+            glUseProgram(pipeline_marker->shader_program);
+            glUniform1f(pipeline_marker->uAlpha, 1.0f);
+            glBindVertexArray(vao_marker);
+            glDrawArraysInstanced(GL_TRIANGLES, 0, marker.vertices.size(), point_traits);
+        }
+       
+        auto pipeline_color = reinterpret_cast<ColorPipeline*>(pipelines[static_cast<int>(PipelineType::COLOR)]);
+        if (num_interval_vertices) {
+            glUseProgram(pipeline_color->shader_program);
+            glUniform1f(pipeline_color->uAlpha, 0.5f);
+
+            glBindVertexArray(vao_interval);
+            glDrawArrays(GL_TRIANGLES, 0, num_interval_vertices);
+        } else if (num_range_tri_vertices) {
+            glUseProgram(pipeline_color->shader_program);
+            glUniform1f(pipeline_color->uAlpha, 0.5f);
+
+            // First draw the range rectangle
+            glBindVertexArray(vao_polyline);
+            glDrawArrays(GL_TRIANGLES, 0, num_range_tri_vertices);
+
+            glUniform1f(pipeline_color->uAlpha, 1.0f);
+        
+            // Now, draw the corner points
+            glBindVertexArray(vao_polypoint);
+            glDrawArrays(GL_POINTS, 0, num_range_pt_vertices);
+        }
         glBindVertexArray(0);
     }
 
@@ -482,7 +548,7 @@ namespace MVF {
     void AttribRenderer::set_range_trait(float x1, float x2) {
         if (descriptors.size() != 1 || std::abs(x1) >= AXIS_LENGTH / 2 || std::abs(x2) >= AXIS_LENGTH / 2) return;
         traits.push_back(Trait {.type = TraitType::RANGE, .data = Range{.type = RangeType::INTERVAL, .range = Interval{.left = x1, .right = x2, 
-            .mesh = IntervalSelector(x1, x2, 0, 0.01f, 0.03f, 0.1f)}}});
+            .mesh = IntervalSelector(x1, x2, 0, 0.01f, 0.03f, 0.1f, global_color_pallete[last_chosen_id])}}, .color_id = get_color_id()});
         setup_traits();
     }
     
@@ -493,7 +559,9 @@ namespace MVF {
         if (descriptors.size() != 1 || std::abs(x_right) >= AXIS_LENGTH / 2) return;
         auto saved_x_left = std::get<Interval>(std::get<Range>(last_trait.data).range).left;  
         std::get<Interval>(std::get<Range>(last_trait.data).range).right = x_right;
-        std::get<Interval>(std::get<Range>(last_trait.data).range).mesh = IntervalSelector(saved_x_left, x_right, 0, 0.01f, 0.03f, 0.1f);
+        std::get<Interval>(std::get<Range>(last_trait.data).range).mesh = IntervalSelector(saved_x_left, x_right, 0, 0.01f, 
+            0.03f, 0.1f, global_color_pallete[last_trait.color_id]);
+        
         setup_traits();
     }
     
@@ -501,7 +569,8 @@ namespace MVF {
         if (descriptors.size() != 2 || std::abs(x_top) >= AXIS_LENGTH / 2 || std::abs(y_top) >= AXIS_LENGTH / 2 
             || std::abs(x_top + width) >= AXIS_LENGTH / 2 || std::abs(y_top + height) >= AXIS_LENGTH / 2) return;
         traits.push_back(Trait {.type = TraitType::RANGE, .data = Range{.type = RangeType::POLYGON, .range = Polygon{.x_top = x_top,
-            .y_top = y_top, .width = width, .height = height, .mesh = PolySelector(x_top, y_top, width, height)}}});
+            .y_top = y_top, .width = width, .height = height, .mesh = PolySelector(x_top, y_top, width, height, global_color_pallete[last_chosen_id])}}, .color_id = get_color_id()});
+
         setup_traits();
     }
 
@@ -516,11 +585,8 @@ namespace MVF {
         auto height = y_end - saved_y_top; 
         std::get<Polygon>(std::get<Range>(last_trait.data).range).width = width;
         std::get<Polygon>(std::get<Range>(last_trait.data).range).height = height;
-        std::get<Polygon>(std::get<Range>(last_trait.data).range).mesh = PolySelector(saved_x_top, saved_y_top, width, height);
-        setup_traits();
-    }
-    
-    void AttribRenderer::set_point_trait(float x) { set_point_trait(x, 0); }
+        std::get<Polygon>(std::get<Range>(last_trait.data).range).mesh = PolySelector(saved_x_top, saved_y_top, 
+            width, height, global_color_pallete[last_trait.color_id]);
 
     void AttribRenderer::set_point_trait(float x, float y) {
         if (descriptors.size() < 1 || std::abs(x) >= AXIS_LENGTH / 2 || std::abs(y) >= AXIS_LENGTH / 2) return;
@@ -549,6 +615,14 @@ namespace MVF {
         float sx = (ndc_x * 0.5f + 0.5f) * viewport_width;
         float sy = (0.5f - ndc_y * 0.5f) * viewport_height;
         return { sx, sy };
+    void AttribRenderer::set_point_trait(float x, float y) {
+        if (descriptors.size() < 1 || std::abs(x) >= AXIS_LENGTH / 2 || std::abs(y) >= AXIS_LENGTH / 2) {
+            return;
+        }
+        
+        traits.push_back(Trait {.type = TraitType::POINT, .data = Point{.x = x, .y = y, .color = global_color_pallete[last_chosen_id]}, .color_id = get_color_id()});
+
+        setup_traits();
     }
 
     void AttribRenderer::on_mouse_move(double mx, double my) {

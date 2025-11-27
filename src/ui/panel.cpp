@@ -10,7 +10,7 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
     static_cast<MVF::SpatialRenderer*>(this->handler->renderer)->entity.set_slice_position(slice_slider.get_value());
     slice_pos = slice_slider.get_value();
     this->handler->queue_render();
-}) {
+}), comp_list({}, [this]() { on_selection(); }) {
     set_label("Spatial panel");
 
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
@@ -19,6 +19,7 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
     rep_menu.append("None");
     rep_menu.set_active(0);
     rep_menu.set_sensitive(false);
+    comp_list.set_sensitive(false);
     rep_menu.signal_changed().connect([this]() {
         if (!data) {
             return;
@@ -29,24 +30,19 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
         auto spatial_renderer = static_cast<MVF::SpatialRenderer*>(this->handler->renderer);
         if (text == "Volume" && selected_mode != Selection::VOLUME) {
             this->handler->make_current();
-            std::vector<std::string> keys;
-            for (auto& [key, _]: data->scalars) {
-                keys.push_back(key);
-            }
-            if (keys.size() == 2) {
-                spatial_renderer->entity.set_vector_mode(keys[0], keys[1]);
+            if (selected_comps.size() == 2) {
+                spatial_renderer->entity.set_vector_mode(selected_comps[0], selected_comps[1]);
             }
             else {
-                spatial_renderer->entity.set_vector_mode(keys[0], keys[1], keys[2]);
+                spatial_renderer->entity.set_vector_mode(selected_comps[0], selected_comps[1], selected_comps[2]);
             }
+
             this->handler->queue_render();
             selected_mode = Selection::VOLUME;
         }
         else if (text == "Slice" && selected_mode != Selection::SLICE) {
             this->handler->make_current();
-            std::string key;
-            for (auto& [k,_]: data->scalars) { key = k; break; }
-            spatial_renderer->entity.set_scalar_slice(key, selected_axis);
+            spatial_renderer->entity.set_scalar_slice(selected_comps[0], selected_axis);
             spatial_renderer->entity.set_slice_position(slice_pos);
             slice_frame.set_visible(true);
             this->handler->queue_render();
@@ -54,9 +50,7 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
         }
         else if (text == "DVR" && selected_mode != Selection::DVR) {
             this->handler->make_current();
-            std::string key;
-            for (auto& [k,_]: data->scalars) { key = k; break; }
-            spatial_renderer->entity.set_dvr(key);
+            spatial_renderer->entity.set_dvr(selected_comps[0]);
             this->handler->queue_render();
             selected_mode = Selection::DVR;
         }
@@ -122,7 +116,9 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
 
     auto spacer = make_managed<Box>(Orientation::VERTICAL);
     spacer->set_vexpand(true);
-    
+   
+    vbox->set_spacing(5);
+    vbox->append(comp_list);
     vbox->append(*rep_box);
     vbox->append(slice_frame);
     vbox->append(*spacer);
@@ -131,8 +127,54 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
     selected_mode = Selection::NONE;
 }
 
+void SpatialPanel::on_selection() {
+    auto comps = comp_list.get_selected();
+
+    // If same as previous, don't do anything
+    if (comps == selected_comps) {
+        return;
+    }
+
+    if (comps.size() > 3) {
+        MVF::app_warn("Please set 3 or less components");
+        comp_list.set_active_mask(selected_comps);
+        return;
+    }
+
+    selected_comps = comps;
+    
+    // Clear all but first entry (None) to avoid duplicates
+    while (rep_menu.get_model()->children().size() > 1) {
+        for (int i = rep_menu.get_model()->children().size() - 1; i >= 1; --i) {
+            rep_menu.remove_text(i);
+        }
+    }
+    
+    if (comps.size() > 1) {
+        rep_menu.append("Volume");
+    }
+    else if (comps.size() == 1) {
+        rep_menu.append("Slice");
+        rep_menu.append("DVR");
+    }
+    rep_menu.set_active(0);
+    selected_mode = Selection::NONE;
+    
+    handler->make_current();
+    static_cast<MVF::SpatialRenderer*>(handler->renderer)->entity.set_box_mode();
+    this->handler->queue_render();
+}
+
 void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     this->data = data;
+    
+    selected_comps.clear();
+    auto field_comps = this->data->scalars | std::views::transform([] (auto& field) {
+        return field.first;
+    }) | std::ranges::to<std::vector<std::string>>();
+
+    comp_list.update_list(field_comps);
+
     // Clear all but first entry (None) to avoid duplicates
     while (rep_menu.get_model()->children().size() > 1) {
         for (int i = rep_menu.get_model()->children().size() - 1; i >= 1; --i) {
@@ -140,15 +182,9 @@ void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
         }
     }
 
-    if (data->scalars.size() >= 2) {
-        rep_menu.append("Volume");
-    }
-    if (data->scalars.size() >= 1) {
-        rep_menu.append("Slice");
-        rep_menu.append("DVR");
-    }
     rep_menu.set_active(0);
     rep_menu.set_sensitive(true);
+    comp_list.set_sensitive(true);
 
     slice_pos = 0;
     slice_slider.set_value(0);
@@ -181,7 +217,6 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler), 
         auto attrib_handler = static_cast<MVF::AttribHandler*>(this->handler);
         attrib_handler->set_point_trait_mode(text == "Point");
     });  
-
 
     comp_list.set_sensitive(false);
     trait_sel.set_sensitive(false);
@@ -283,16 +318,14 @@ void FieldPanel::set_traits(const std::vector<MVF::AxisDescMeta>& attrib_comps, 
 }
     
 void FieldPanel::complete_set_traits() {
-    rep_menu.set_sensitive(true);
-    iso_slider.set_sensitive(true);
+    enable_panel();
     auto field_handler = static_cast<MVF::FieldRenderer*>(handler->renderer); 
     field_handler->entity.complete_set_traits();
     handler->queue_render();
 }
 
 void FieldPanel::clear_traits() {
-    rep_menu.set_sensitive(false);
-    iso_slider.set_sensitive(false);
+    disable_panel();
 
     handler->make_current();
     auto field_handler = static_cast<MVF::FieldRenderer*>(handler->renderer); 
@@ -303,11 +336,13 @@ void FieldPanel::clear_traits() {
 void FieldPanel::enable_panel() {
     rep_menu.set_sensitive(true);
     iso_slider.set_sensitive(true);
+    apply_color.set_sensitive(true);
 }
 
 void FieldPanel::disable_panel() {
     rep_menu.set_sensitive(false);
     iso_slider.set_sensitive(false);
+    apply_color.set_sensitive(false);
 }
 
 FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler), iso_slider([this]() {
@@ -319,7 +354,6 @@ FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler), iso_sli
     rep_menu.append("Isosurface");
     rep_menu.append("DVR");
     rep_menu.set_active(0);
-    rep_menu.set_sensitive(false);
 
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
     auto rep_box = make_managed<Box>();
@@ -327,17 +361,24 @@ FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler), iso_sli
     rep_box->set_spacing(5);
     rep_box->set_margin(5);
     rep_box->append(*rep_label);
-    rep_box->append(rep_menu);
-    
+    rep_box->append(rep_menu);    
+   
+    apply_color = CheckButton("Apply colormap");
+
     auto spacer = make_managed<Box>(Orientation::VERTICAL);
     spacer->set_vexpand(true);
     
     vbox->append(*rep_box);
     vbox->append(iso_slider);
+    vbox->append(apply_color);
     vbox->append(*spacer);
 
-    iso_slider.set_sensitive(false);
+    apply_color.signal_toggled().connect([this] {
+        static_cast<MVF::FieldRenderer*>(this->handler->renderer)->entity.set_apply_color(apply_color.get_active());
+        this->handler->queue_render();
+    });
 
+    disable_panel();
     set_child(*vbox);
 }
 
@@ -347,7 +388,6 @@ void FieldPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     handler->make_current();
     field_renderer->setup_scene(data);
     field_renderer->entity.clear_traits();
-    iso_slider.set_sensitive(false);
-    rep_menu.set_sensitive(false);
+    disable_panel();
     handler->queue_render();
 }

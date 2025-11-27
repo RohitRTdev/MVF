@@ -19,6 +19,18 @@ namespace MVF {
         vertices.push_back({x, y + h});
     }
     
+    void add_rect(std::vector<Point>& vertices, float x, float y, float w, float h, const Vector3f& color) {
+        // Triangle 1
+        vertices.push_back(Point{x, y, color});
+        vertices.push_back(Point{x + w, y, color});
+        vertices.push_back(Point{x + w, y + h, color});
+
+        // Triangle 2
+        vertices.push_back(Point{x, y, color});
+        vertices.push_back(Point{x + w, y + h, color});
+        vertices.push_back(Point{x, y + h, color});
+    }
+    
     void add_rect_outline(std::vector<Vector2f>& vertices, float x, float y, float w, float h) {
         // Line 1
         vertices.push_back({x, y});
@@ -273,7 +285,7 @@ namespace MVF {
     
     
     IntervalSelector::IntervalSelector(float x_left, float x_right, float center_y, 
-        float line_thickness, float handle_width, float handle_height) {
+        float line_thickness, float handle_width, float handle_height, const Vector3f& color) {
         vertices.reserve(6 * 4); // 4 rectangles
 
         float half_line = line_thickness * 0.5f;
@@ -281,25 +293,27 @@ namespace MVF {
         float half_handle_h = handle_height * 0.5f;
 
         // Base Line (full width from -1 to +1)
-        add_rect(vertices, x_left, center_y - half_line, x_right - x_left, line_thickness);
+        add_rect(vertices, x_left, center_y - half_line, x_right - x_left, line_thickness, color);
 
         // Selected Region
-        add_rect(vertices, x_left, center_y - half_line, (x_right - x_left), line_thickness);
+        add_rect(vertices, x_left, center_y - half_line, (x_right - x_left), line_thickness, color);
 
         // Left Handle
-        add_rect(vertices, x_left - half_handle_w, center_y - half_handle_h, handle_width, handle_height);
+        add_rect(vertices, x_left - half_handle_w, center_y - half_handle_h, handle_width, handle_height, color);
 
         // Right Handles
-        add_rect(vertices, x_right - half_handle_w, center_y - half_handle_h, handle_width, handle_height);
+        add_rect(vertices, x_right - half_handle_w, center_y - half_handle_h, handle_width, handle_height, color);
     }
-
-    PolySelector::PolySelector(float x_top, float y_top, float width, float height) {
-        add_rect(tri_vertices, x_top, y_top, width, height);
+    
+    PolySelector::PolySelector(float x_top, float y_top, float width, float height, const Vector3f& color) {
+        const Vector3f POINT_COLOR = Vector3f(1.0, 0.0, 0.0); 
         
-        pt_vertices.push_back(Vector2f(x_top, y_top));
-        pt_vertices.push_back(Vector2f(x_top + width, y_top));
-        pt_vertices.push_back(Vector2f(x_top, y_top + height));
-        pt_vertices.push_back(Vector2f(x_top + width, y_top + height));
+        add_rect(tri_vertices, x_top, y_top, width, height, color);
+        
+        pt_vertices.push_back(Point{x_top, y_top, POINT_COLOR});
+        pt_vertices.push_back(Point{x_top + width, y_top, POINT_COLOR});
+        pt_vertices.push_back(Point{x_top, y_top + height, POINT_COLOR});
+        pt_vertices.push_back(Point{x_top + width, y_top + height, POINT_COLOR});
     }
 }
 

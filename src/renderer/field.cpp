@@ -21,10 +21,19 @@ namespace MVF {
     void FieldEntity::create_buffers() {
         // Create the 3d textures
         glGenTextures(1, &tex3d);
+        glGenTextures(1, &tex3d_col);
         glBindTexture(GL_TEXTURE_3D, tex3d);
 
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        
+        glBindTexture(GL_TEXTURE_3D, tex3d_col);
+
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -33,9 +42,15 @@ namespace MVF {
         GLuint ssbo;
         glGenBuffers(1, &ssbo);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(int) * 256 * 16, tri_table, GL_STATIC_DRAW);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(tri_table), tri_table, GL_STATIC_DRAW);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo); 
         
+        GLuint ssbo_edge;
+        glGenBuffers(1, &ssbo_edge);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_edge);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(edge_table), edge_table, GL_STATIC_DRAW);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo_edge); 
+       
         // Create the buffers for isosurface extraction
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
@@ -74,6 +89,7 @@ namespace MVF {
     void FieldEntity::build_distance_field() {
         auto grid_size = geometry_entity->model->nx * geometry_entity->model->ny * geometry_entity->model->nz;
         field.resize(grid_size);
+        color_field.resize(grid_size);
         
         float max_dist = 0;
         for (int i = 0; i < grid_size; i++) {
@@ -91,12 +107,17 @@ namespace MVF {
                 pt[dim] = fld[i];
             }
 
-            // Calculate the min distance of the traits to this point (accumulate min across all traits)
+            // Calculate the min distance of the traits to this point
+            // For now, we do this naively
+            Trait* sel_trait = nullptr;
             for (auto& trait: traits) {
                 float dist = INFINITY;
                 switch(trait.type) {
                     case TraitType::POINT: {
                         auto& tr_pt = std::get<Point>(trait.data);
+                        
+                        // Calculate euclidean dist
+                        // We won't take the square root, as we just need a varying field
                         if (attrib_comps.size() == 1) {
                             dist = (tr_pt.x - pt[0]) * (tr_pt.x - pt[0]);
                         } 
@@ -156,11 +177,37 @@ namespace MVF {
                     }
                 }
                 min_dist = std::min(dist, min_dist);
+                        }
+                    }
+                }
+                
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    sel_trait = &trait; 
+                }
             }
 
             max_dist = std::max(min_dist, max_dist);
             field[i] = min_dist;
+            color_field[i] = global_color_pallete[sel_trait->color_id];
         }
+
+        // Normalize the field
+        field = field | 
+        std::views::transform([max_dist] (auto& pt) {
+            return pt / max_dist;
+        }) | std::ranges::to<std::vector<float>>();
+
+#ifdef MVF_DEBUG
+        size_t zero_count = 0;
+        for (auto& val: field) {
+            if (val >= 0 && val <= 0.05) {
+                zero_count++;
+            }
+        }
+
+        std::cout << "Zero count: " << zero_count << std::endl;
+#endif
 
         field = field | std::views::transform([max_dist] (float val) { return max_dist > 0 ? (val / max_dist) : 0.0f;}) | std::ranges::to<std::vector<float>>();
         set_draw_mode = true;
@@ -171,6 +218,10 @@ namespace MVF {
         glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, geometry_entity->model->nx, geometry_entity->model->ny,
             geometry_entity->model->nz, 0, GL_RED, GL_FLOAT, field.data()
         );
+    
+        glBindTexture(GL_TEXTURE_3D, tex3d_col);
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB32F, geometry_entity->model->nx, geometry_entity->model->ny, 
+            geometry_entity->model->nz, 0, GL_RGB, GL_FLOAT, color_field.data()); 
     }
 
     void FieldEntity::complete_set_traits() {
@@ -187,6 +238,10 @@ namespace MVF {
     void FieldEntity::set_traits(const std::vector<AxisDescMeta>& attrib_comps, const std::vector<Trait>& traits) {
         if (attrib_comps.empty()) {
             throw std::runtime_error("At least one attribute component required...");
+        }
+
+        if (traits.size() == 0) {
+            throw std::runtime_error("set_traits() called with traits.size() == 0");
         }
 
         dist_fld_lock.lock();
@@ -271,6 +326,10 @@ namespace MVF {
         iso_value = value;
     }
         
+    void FieldEntity::set_apply_color(bool apply_color) {
+        is_apply_color = apply_color;   
+    }
+
     void FieldEntity::clear_traits() {
         set_draw_mode = false;
     }
@@ -282,6 +341,9 @@ namespace MVF {
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_3D, tex3d);
+        
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_3D, tex3d_col);
         
         glBindVertexArray(vao);
         glDrawArrays(GL_POINTS, 0, res_x * res_y * res_z);
@@ -300,6 +362,8 @@ namespace MVF {
             return;
         }
 
+        // There are 2 entities here. SpatialRenderer::entity takes care of transforms, camera, lighting, bounding box etc
+        // Our entity is responsible for displaying computed distance field
         auto limits = Vector3f(SpatialRenderer::entity.model->nx, SpatialRenderer::entity.model->ny, SpatialRenderer::entity.model->nz);
 		Matrix4f mvp = projection * camera.view * SpatialRenderer::entity.world * SpatialRenderer::entity.scale_transform * SpatialRenderer::entity.init_transform;
 		Matrix4f mp = SpatialRenderer::entity.world * SpatialRenderer::entity.scale_transform * SpatialRenderer::entity.init_transform;
@@ -317,6 +381,8 @@ namespace MVF {
         glUniform3fv(pipeline->uSpacing, 1, SpatialRenderer::entity.model->spacing);
         glUniform3fv(pipeline->uLimits, 1, limits);
         glUniform3fv(pipeline->uSteps, 1, entity.steps); 
+        glUniform1i(pipeline->uApplyColor, entity.is_apply_color); 
+
         entity.draw();
     }
 

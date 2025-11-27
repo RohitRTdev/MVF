@@ -185,14 +185,14 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
     pane.set_start_child(spatial_box);
     pane.set_css_classes({"draw-board"});
    
-    pane.signal_realize().connect([this]() {
-        // Wait for one main loop iteration so allocation is ready
-        Glib::signal_idle().connect_once([this] () {
+    pane.signal_map().connect([this]() {
+        Glib::signal_idle().connect_once([this]() {
             int width = pane.get_allocated_width();
             if (width > 0)
                 pane.set_position(width / 2);
         });
     });
+
     m_hbox.append(pane);
 
     spatial_panel.set_vexpand(true);
@@ -307,7 +307,7 @@ void MainWindow::disable_ui_async_state() {
     
 void MainWindow::toggle_attrib_space() {
     if (is_attrib_space_visible) {
-        pane.unset_end_child();
+        gtk_paned_set_end_child(pane.gobj(), nullptr);
         attrib_panel.disable_panel();
     }
     else {

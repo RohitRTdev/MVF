@@ -127,11 +127,15 @@ namespace MVF {
         float hovered_world_y = 0.0f;
         std::string hover_text;
         void setup_buffers();
+        size_t last_chosen_id = 0;
+
+        void setup_buffers(); 
         void setup_traits();
         void generate_scatter_plot();
         void generate_freq_distribution();
         void generate_parallel_coordinates();
         void setup_plot();
         void clear_plot();
+        size_t get_color_id();
     };
 }

@@ -3,7 +3,61 @@ set -e
 
 # Utility functions
 info() { echo "[INFO] $*"; }
-err()  { echo "[ERROR] $*" >&2; rm -f "$TMPFILE" "$OUTFILE"; exit 1; }
+err()  { 
+  echo "[ERROR] $1" >&2;
+  rm -f "$TMPFILE" "$OUTFILE";
+  if [ $2 -eq 1 ]; then 
+    exit 1;
+  fi
+}
+
+check_compiler_support() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    info "$1 not found in PATH"
+    return 1
+  fi
+
+  info "Detected compiler: $1"
+
+  # Check for C++23 support
+  info "Checking for C++23 support..."
+  TMPFILE="$(mktemp testcppXXXXXX.cpp)"
+  OUTFILE="$(mktemp testoutXXXX.exe)"
+  cat > "$TMPFILE" <<'EOF'
+#if __cplusplus < 202002L
+#error "C++23 not supported"
+#endif
+int main() { return 0; }
+EOF
+  
+  if "$1" -std=c++23 -o "$OUTFILE" "$TMPFILE" >"$OUTFILE" 2>&1; then
+    info "Compiler supports C++23"
+  else
+    err "Compiler does not support -std=c++23" 0
+    return 1
+  fi
+
+  info "Checking for <ranges> support..."
+  cat > "$TMPFILE" <<'EOF'
+#include <ranges>
+#include <vector>
+int main() {
+  auto v = std::views::iota(0, 3)
+  | std::ranges::to<std::vector>();
+}
+EOF
+
+  if "$1" -std=c++23 -o "$OUTFILE" "$TMPFILE" >"$OUTFILE" 2>&1; then
+    info "Compiler supports <ranges> library"
+  else
+    err "Compiler doesn't provide <ranges> library" 0
+    return 1
+  fi
+
+  rm -f "$TMPFILE" "$OUTFILE"
+  return 0
+}
+
 
 # Detect environment
 UNAME=$(uname -s)
@@ -17,6 +71,7 @@ case "$UNAME" in
 esac
 info "Detected platform: $PLATFORM"
 
+<<<<<<< HEAD
 # Compiler detection
 CXX=${CXX:-g++}
 command -v "$CXX" >/dev/null 2>&1 || err "g++ not found in PATH"
@@ -58,10 +113,33 @@ rm -f "$TMPFILE" "$OUTFILE"
 command -v pkg-config >/dev/null 2>&1 || err "pkg-config not found"
 info "Checking for gtkmm >= 4.0..."
 pkg-config --exists 'gtkmm-4.0 >= 4.0' || err "gtkmm >= 4.0 is required"
+=======
+# Feel free to add more
+CXX_LIST="g++ g++-14 NULL"
+
+# Testing available compilers
+for compiler in $CXX_LIST; do 
+  if [ "$compiler" = "NULL" ]; then
+    err "No compatible compilers found..." 1
+  fi
+  info "Testing compiler $compiler"
+  if check_compiler_support $compiler; then
+    CXX=$compiler
+    break
+  fi
+
+done
+
+# pkg-config and dependencies
+command -v pkg-config >/dev/null 2>&1 || err "pkg-config not found" 1
+
+info "Checking for gtkmm-4.0..."
+pkg-config --exists 'gtkmm-4.0 >= 4.10' || err "gtkmm >= 4.10 is required" 1
+>>>>>>> a568ab8097e5d7a708f716b62f6c2f52c0b0df8f
 info "Found gtkmm-4.0"
 
 info "Checking for epoxy..."
-pkg-config --exists 'epoxy' || err "libepoxy is required"
+pkg-config --exists 'epoxy' || err "libepoxy is required" 1
 info "Found libepoxy"
 
 # Check for OpenGL headers
@@ -80,7 +158,7 @@ for hdr in $GL_HEADERS; do
   fi
 done
 
-[ $FOUND_GL -eq 1 ] || err "OpenGL headers not found!"
+[ $FOUND_GL -eq 1 ] || err "OpenGL headers not found!" 1
 
 # -------------------------
 #   VTK SUPPORT

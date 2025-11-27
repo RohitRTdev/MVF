@@ -8,6 +8,11 @@
 
 namespace MVF {
 #pragma pack(push, 1)
+    struct Point {
+        float x, y;
+        Vector3f color;
+    };
+    
     struct Vertex {
         float x, y, z;
 
@@ -29,6 +34,7 @@ namespace MVF {
 #pragma pack(pop)
 
     void add_rect(std::vector<Vector2f>& vertices, float x, float y, float w, float h);
+    void add_rect(std::vector<Point>& vertices, float x, float y, float w, float h, const Vector3f& color);
     void add_rect_outline(std::vector<Vector2f>& vertices, float x, float y, float w, float h);
     
     struct ArrowMesh {
@@ -83,16 +89,17 @@ namespace MVF {
     };
 
     struct IntervalSelector {
-        std::vector<Vector2f> vertices;
+        std::vector<Point> vertices;
 
         IntervalSelector() = default;
-        IntervalSelector(float x_left, float x_right, float center_y, float line_thickness, float handle_width, float handle_height);
+        IntervalSelector(float x_left, float x_right, float center_y, float line_thickness, 
+            float handle_width, float handle_height, const Vector3f& color);
     };
 
     struct PolySelector {
-        std::vector<Vector2f> tri_vertices, pt_vertices;
+        std::vector<Point> tri_vertices, pt_vertices;
 
         PolySelector() = default;
-        PolySelector(float x_top, float y_top, float width, float height);
+        PolySelector(float x_top, float y_top, float width, float height, const Vector3f& color);
     };
 }
