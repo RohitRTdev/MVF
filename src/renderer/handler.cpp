@@ -2,6 +2,8 @@
 #include <format>
 #include <epoxy/gl.h>
 #include <ranges>
+#include <limits>
+#include <cmath>
 #include "error.h"
 #include "handler.h"
 #include "ui.h"
@@ -12,12 +14,9 @@ constexpr float ZOOM_FACTOR = 0.01f;
 constexpr float DETECT_THRESHOLD = 0.015f;
 constexpr float RANGE_ZERO_WIDTH = 0.01f;
 
-// Widget -> Top left is (0, 0) and bottom right is (max_width, max_height)
-// NDC -> Center is (0, 0). Y increases upwards and X increases towards the right
 static std::pair<double, double> convert_to_ndc(double x, double y, size_t width, size_t height) {
     auto x_ndc = ((x / width) * 2.0) - 1;
     auto y_ndc = 1 - ((y / height) * 2.0);
-
     return std::make_pair(x_ndc, y_ndc);
 }
 
@@ -43,6 +42,10 @@ namespace MVF {
 
     void RenderHandler::on_resize(int width, int height) {
         renderer->set_viewport(width, height);
+        // propagate viewport size to attrib renderer for overlay coordinate mapping
+        if (auto ar = dynamic_cast<AttribRenderer*>(renderer)) {
+            ar->update_viewport_size(width, height);
+        }
     }
 
     void RenderHandler::on_realize() {
@@ -136,10 +139,29 @@ namespace MVF {
     }
 
     AttribHandler::AttribHandler(AttribRenderer* renderer) : RenderHandler(renderer, false) {
+
+        set_focusable(true);  // <-- REQUIRED
         auto mouse_click = Gtk::GestureClick::create();
         mouse_click->set_button(GDK_BUTTON_PRIMARY);
         mouse_click->signal_pressed().connect(sigc::mem_fun(*this, &AttribHandler::on_mouse_click));
+        // Grab focus on mouse click to allow key events
+        mouse_click->signal_pressed().connect([this](gint, double, double) {
+            grab_focus();      // <-- focus obtained here
+            });
         add_controller(mouse_click);
+        // Add key controller for sampling toggle in parallel coordinates
+        auto key_ctrl = Gtk::EventControllerKey::create();
+        key_ctrl->signal_key_pressed().connect([this](guint keyval, guint keycode, Gdk::ModifierType state){
+            if (state != static_cast<Gdk::ModifierType>(0)) return false;
+            if (keyval == GDK_KEY_p) {
+                auto ar = static_cast<AttribRenderer*>(this->renderer);
+                ar->cycle_sample_period();
+                this->queue_render();
+                return true;
+            }
+            return false;
+        }, false);
+        add_controller(key_ctrl);
         auto motion = Gtk::EventControllerMotion::create();
         motion->signal_motion().connect([this](double x, double y) {
             auto [x_ndc, y_ndc] = convert_to_ndc(x, y, get_allocated_width(), get_allocated_height());
@@ -147,11 +169,65 @@ namespace MVF {
             auto x_bound = AXIS_LENGTH / 2;
             auto y_bound = field_comps.size() == 1 ? DETECT_THRESHOLD :  AXIS_LENGTH / 2;
             
-            if (field_comps.size() == 0 || std::abs(y_ndc) > y_bound || std::abs(x_ndc) > x_bound) {
+            if (field_comps.empty() || std::abs(y_ndc) > y_bound || std::abs(x_ndc) > x_bound) {
                 this->mouse_overlay.hide_now();
                 return;
             }
 
+            // Parallel coordinates (>=3 components): show only when close to an axis
+            if (field_comps.size() > 2) {
+                float span = AXIS_LENGTH;
+                size_t n = field_comps.size();
+                float dx = span / (n - 1);
+                float x0 = -AXIS_LENGTH / 2;
+                int nearest = -1;
+                float best_dist = 1.0f; // ndc threshold
+                for (size_t i = 0; i < n; ++i) {
+                    float axis_x = x0 + i * dx;
+                    float d = std::abs(x_ndc - axis_x);
+                    if (d < best_dist) { best_dist = d; nearest = static_cast<int>(i);}    
+                }
+                constexpr float AXIS_DETECT_THRESHOLD = 0.02f; // tighten axis hover sensitivity
+                if (nearest == -1 || best_dist > AXIS_DETECT_THRESHOLD) {
+                    this->mouse_overlay.hide_now();
+                    return;
+                }
+                // Map vertical coordinate to field value
+                try {
+                    auto val_f = static_cast<AttribRenderer*>(this->renderer)->get_field_point(y_ndc, nearest);
+                    std::string text = std::format("{}={:.2f}", field_comps[nearest], val_f);
+                    this->mouse_overlay.show_at(static_cast<int>(x), static_cast<int>(y), text);
+                } catch(...) {
+                    this->mouse_overlay.hide_now();
+                }
+                // live update selection during range drag if active (no highlight here)
+                if (activate_range_selection && !is_point_trait) {
+                    auto ar = static_cast<AttribRenderer*>(this->renderer);
+                    float wy = y_ndc * (AXIS_LENGTH/2.0f);
+                    size_t nAx = n;
+                    if (parallel_range_selection.size() != nAx) parallel_range_selection.assign(nAx, {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN()});
+                    if (range_has_first.size() != nAx) range_has_first.assign(nAx, false);
+
+                    // rebuild all pending crosses: both first and finalized second for each axis
+                    ar->clear_parallel_pending_markers();
+                    for (size_t i = 0; i < nAx; ++i) {
+                        if (range_has_first[i]) {
+                            ar->add_parallel_pending_marker(i, parallel_range_selection[i].first);
+                            if (!std::isnan(parallel_range_selection[i].second) && parallel_range_selection[i].second != parallel_range_selection[i].first) {
+                                ar->add_parallel_pending_marker(i, parallel_range_selection[i].second);
+                            }
+                        }
+                    }
+                    // for current axis, if only first is set and second not yet finalized, show live second
+                    if (range_has_first[nearest] && (std::isnan(parallel_range_selection[nearest].second) || parallel_range_selection[nearest].second == parallel_range_selection[nearest].first)) {
+                        ar->add_parallel_pending_marker(nearest, wy);
+                    }
+                    this->queue_render();
+                }
+                return;
+            }
+
+            // 1 or 2 components (existing behavior)
             auto x_f = static_cast<AttribRenderer*>(this->renderer)->get_field_point(x_ndc, 0);
             std::string text = std::format("{}={:.2f}", field_comps[0], x_f);
             if (field_comps.size() == 2) {
@@ -160,7 +236,7 @@ namespace MVF {
             }
             this->mouse_overlay.show_at(static_cast<int>(x), static_cast<int>(y), text);
             
-            if (activate_range_selection) {
+            if (activate_range_selection && field_comps.size() <= 2) {
                 field_comps.size() == 1 ? static_cast<AttribRenderer*>(this->renderer)->modify_range_trait(x_ndc) :
                 static_cast<AttribRenderer*>(this->renderer)->modify_range_trait(x_ndc, y_ndc);
             }
@@ -191,10 +267,22 @@ namespace MVF {
         | std::ranges::to<std::vector>();
         
         static_cast<AttribRenderer*>(renderer)->set_attrib_space_axis(descriptors);
+        // reset parallel selection state
+        parallel_point_selection.clear();
+        parallel_range_selection.clear();
+        range_has_first.clear();
+        if (field_comps.size() > 2) {
+            parallel_point_selection.resize(field_comps.size(), std::numeric_limits<float>::quiet_NaN());
+            parallel_range_selection.resize(field_comps.size(), {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN()});
+            range_has_first.resize(field_comps.size(), false);
+        }
     }
     
     void AttribHandler::clear_field_info() {
         field_comps.clear();
+        parallel_point_selection.clear();
+        parallel_range_selection.clear();
+        range_has_first.clear();
     }
 
     bool SpatialHandler::on_key_pressed(guint keyval, guint keycode, Gdk::ModifierType state) {
@@ -266,35 +354,67 @@ namespace MVF {
     void AttribHandler::on_mouse_click(int n_press, double x, double y) {
         auto width = get_allocated_width();
         auto height = get_allocated_height();
-
         auto [x_ndc, y_ndc] = convert_to_ndc(x, y, width, height);
 
-        if (field_comps.size() != 1 && field_comps.size() != 2) {
-            return;
-        }
-        
-        auto x_bound = AXIS_LENGTH / 2;
-        auto y_bound = field_comps.size() == 1 ? DETECT_THRESHOLD :  AXIS_LENGTH / 2;
-        
-        if (std::abs(y_ndc) > y_bound || std::abs(x_ndc) > x_bound) {
-            return;
+        if (field_comps.size() > 2) {
+            float span = AXIS_LENGTH; size_t n = field_comps.size(); float dx = span / (n - 1); float x0 = -AXIS_LENGTH / 2;
+            int nearest = -1; float best_dist = 1.0f;
+            for (size_t i = 0; i < n; ++i) { float axis_x = x0 + i * dx; float d = std::abs(x_ndc - axis_x); if (d < best_dist) { best_dist = d; nearest = (int)i; } }
+            constexpr float AXIS_DETECT_THRESHOLD = 0.02f; if (nearest == -1 || best_dist > AXIS_DETECT_THRESHOLD) return;
+            make_current(); auto ar = static_cast<AttribRenderer*>(renderer); float wy = y_ndc * (AXIS_LENGTH/2.0f);
+            if (is_point_trait) {
+                if (parallel_point_selection.size() != n) parallel_point_selection.assign(n, std::numeric_limits<float>::quiet_NaN());
+                if (!std::isnan(parallel_point_selection[nearest])) return; // one point per axis per line build
+                parallel_point_selection[nearest] = wy; ar->add_parallel_pending_marker(nearest, wy);
+                bool all_set = true; for (size_t i = 0; i < n; ++i) if (std::isnan(parallel_point_selection[i])) { all_set = false; break; }
+                if (all_set) {
+                    ar->select_parallel_line_by_points(parallel_point_selection);
+                    std::fill(parallel_point_selection.begin(), parallel_point_selection.end(), std::numeric_limits<float>::quiet_NaN());
+                    handle_traits = true; // flag for UI apply enable
+                }
+            } else { // range selection
+                if (parallel_range_selection.size() != n) parallel_range_selection.assign(n, {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN()});
+                if (range_has_first.size() != n) range_has_first.assign(n, false);
+                if (!range_has_first[nearest]) {
+                    parallel_range_selection[nearest].first = wy; parallel_range_selection[nearest].second = wy; range_has_first[nearest] = true; activate_range_selection = true; ar->add_parallel_pending_marker(nearest, wy);
+                } else if (std::isnan(parallel_range_selection[nearest].second) || parallel_range_selection[nearest].second == parallel_range_selection[nearest].first) {
+                    parallel_range_selection[nearest].second = wy; ar->add_parallel_pending_marker(nearest, wy); // second cross
+                } else { // already two points this axis -> ignore extra
+                    return;
+                }
+                bool all_axes_have_two = true;
+                for (size_t i = 0; i < n; ++i) {
+                    if (!range_has_first[i] || std::isnan(parallel_range_selection[i].second) || parallel_range_selection[i].second == parallel_range_selection[i].first) { all_axes_have_two = false; break; }
+                }
+                if (all_axes_have_two) {
+                    ar->select_parallel_region_by_ranges(parallel_range_selection);
+                    activate_range_selection = false;
+                    std::fill(range_has_first.begin(), range_has_first.end(), false);
+                    handle_traits = true;
+                }
+            }
+            queue_render(); return;
         }
 
-        handle_traits = true;
-        make_current();
+        if (field_comps.size() != 1 && field_comps.size() != 2) return;
+        auto x_bound = AXIS_LENGTH / 2; auto y_bound = field_comps.size() == 1 ? DETECT_THRESHOLD : AXIS_LENGTH / 2;
+        if (std::abs(y_ndc) > y_bound || std::abs(x_ndc) > x_bound) return;
+        handle_traits = true; make_current();
         if (is_point_trait) {
-            field_comps.size() == 1 ? static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc) : 
-            static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc, y_ndc);
-        }
-        else {
+            field_comps.size() == 1 ? static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc) : static_cast<AttribRenderer*>(renderer)->set_point_trait(x_ndc, y_ndc);
+        } else {
             activate_range_selection = true;
-            field_comps.size() == 1 ? static_cast<AttribRenderer*>(renderer)->set_range_trait(x_ndc, x_ndc + RANGE_ZERO_WIDTH) :
-            static_cast<AttribRenderer*>(renderer)->set_range_trait(x_ndc, y_ndc, RANGE_ZERO_WIDTH, RANGE_ZERO_WIDTH);
+            field_comps.size() == 1 ? static_cast<AttribRenderer*>(renderer)->set_range_trait(x_ndc, x_ndc + RANGE_ZERO_WIDTH) : static_cast<AttribRenderer*>(renderer)->set_range_trait(x_ndc, y_ndc, RANGE_ZERO_WIDTH, RANGE_ZERO_WIDTH);
         }
         queue_render();
     }
         
     void AttribHandler::set_point_trait_mode(bool set_point_trait) {
         is_point_trait = set_point_trait;
+        // reset parallel selection state when mode changes
+        std::fill(range_has_first.begin(), range_has_first.end(), false);
+        auto ar = static_cast<AttribRenderer*>(renderer);
+        this->make_current();
+        ar->clear_parallel_pending_markers();
     }
 }

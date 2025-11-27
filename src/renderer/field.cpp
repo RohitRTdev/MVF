@@ -91,41 +91,45 @@ namespace MVF {
                 pt[dim] = fld[i];
             }
 
-            // Calculate the min distance of the traits to this point
-            // For now, we do this naively
+            // Calculate the min distance of the traits to this point (accumulate min across all traits)
             for (auto& trait: traits) {
                 float dist = INFINITY;
                 switch(trait.type) {
                     case TraitType::POINT: {
                         auto& tr_pt = std::get<Point>(trait.data);
-                        
-                        // Calculate euclidean dist
-                        // We won't take the square root, as we just need a varying field
                         if (attrib_comps.size() == 1) {
                             dist = (tr_pt.x - pt[0]) * (tr_pt.x - pt[0]);
                         } 
-                        else {
+                        else if (attrib_comps.size() >= 2) {
                             dist = (tr_pt.y - pt[1]) * (tr_pt.y - pt[1]) + (tr_pt.x - pt[0]) * (tr_pt.x - pt[0]);
                         } 
-
+                        break;
+                    }
+                    case TraitType::PARALLEL_POINT: {
+                        auto& nd = std::get<NDPoint>(trait.data);
+                        float dsum = 0.0f;
+                        size_t m = std::min(nd.ys.size(), pt.size());
+                        for (size_t a = 0; a < m; ++a) {
+                            float d = nd.ys[a] - pt[a];
+                            dsum += d * d;
+                        }
+                        dist = dsum;
                         break;
                     }
                     case TraitType::RANGE: {
-                        if (std::get<Range>(trait.data).type == RangeType::INTERVAL) {
-                            auto& tr_int = std::get<Interval>(std::get<Range>(trait.data).range);
+                        auto& r = std::get<Range>(trait.data);
+                        if (r.type == RangeType::INTERVAL) {
+                            auto& tr_int = std::get<Interval>(r.range);
                             if (pt[0] >= tr_int.left && pt[0] <= tr_int.right) {
                                 dist = 0;
                             }
                             else {
-                                dist = std::min(std::abs(tr_int.left - pt[0]), std::abs(tr_int.right - pt[0])) * 
-                                std::min(std::abs(tr_int.left - pt[0]), std::abs(tr_int.right - pt[0]));
+                                float d = std::min(std::abs(tr_int.left - pt[0]), std::abs(tr_int.right - pt[0]));
+                                dist = d * d;
                             }
                         }
-                        else {
-                            // We are cheating a bit here. Instead of finding closest point 
-                            // (using something like AABB intersection), we're just calculating
-                            // the distance to the midpoint of the polygonal trait
-                            auto& tr_poly = std::get<Polygon>(std::get<Range>(trait.data).range);
+                        else if (r.type == RangeType::POLYGON) {
+                            auto& tr_poly = std::get<Polygon>(r.range);
                             if (pt[0] >= tr_poly.x_top && pt[0] <= tr_poly.x_top + tr_poly.width 
                             && pt[1] >= tr_poly.y_top && pt[1] <= tr_poly.y_top + tr_poly.height) {
                                 dist = 0;
@@ -135,31 +139,30 @@ namespace MVF {
                                 float mid_pt_y = tr_poly.y_top + tr_poly.height / 2;   
                                 dist = (mid_pt_y - pt[1]) * (mid_pt_y - pt[1]) + (mid_pt_x - pt[0]) * (mid_pt_x - pt[0]);
                             }
+                        } else if (r.type == RangeType::HYPERBOX) {
+                            auto& hb = std::get<HyperBox>(r.range);
+                            float dsum = 0.0f;
+                            size_t m = std::min(hb.yranges.size(), pt.size());
+                            for (size_t a = 0; a < m; ++a) {
+                                float a0 = hb.yranges[a].first;
+                                float a1 = hb.yranges[a].second;
+                                if (a0 > a1) std::swap(a0, a1);
+                                if (pt[a] < a0) { float d = a0 - pt[a]; dsum += d * d; }
+                                else if (pt[a] > a1) { float d = pt[a] - a1; dsum += d * d; }
+                                else { /* inside -> zero */ }
+                            }
+                            dist = dsum;
                         }
                     }
                 }
                 min_dist = std::min(dist, min_dist);
             }
 
-            // This is for normalization purposes
             max_dist = std::max(min_dist, max_dist);
             field[i] = min_dist;
         }
 
-        // Normalize the field
-        field = field | std::views::transform([max_dist] (float val) { return val / max_dist;}) | std::ranges::to<std::vector<float>>();
-
-#ifdef MVF_DEBUG
-        size_t zero_count = 0;
-        for (auto& val: field) {
-            if (val >= 0 && val <= 0.05) {
-                zero_count++;
-            }
-        }
-
-        std::cout << "Zero count: " << zero_count << std::endl;
-#endif
-
+        field = field | std::views::transform([max_dist] (float val) { return max_dist > 0 ? (val / max_dist) : 0.0f;}) | std::ranges::to<std::vector<float>>();
         set_draw_mode = true;
     }
 
@@ -170,8 +173,6 @@ namespace MVF {
         );
     }
 
-    // Our distance field computation is done
-    // We can release lock and perform any stalled computation
     void FieldEntity::complete_set_traits() {
         if (worker_thread.joinable()) {
             worker_thread.join();
@@ -184,8 +185,8 @@ namespace MVF {
     }
 
     void FieldEntity::set_traits(const std::vector<AxisDescMeta>& attrib_comps, const std::vector<Trait>& traits) {
-        if (attrib_comps.size() != 1 && attrib_comps.size() != 2) {
-            throw std::runtime_error("Only 1 and 2 dimensional traits supported for now...");
+        if (attrib_comps.empty()) {
+            throw std::runtime_error("At least one attribute component required...");
         }
 
         dist_fld_lock.lock();
@@ -193,54 +194,65 @@ namespace MVF {
         this->attrib_comps = attrib_comps;
         this->traits = traits;
 
-        // [-AXIS_LENGTH / 2, AXIS_LENGTH / 2] -> [min_val, max_val]
         auto get_pt_norm = [this] (float val, size_t fld_dim) {
             auto pt_norm = val / (AXIS_LENGTH / 2);
             return 0.5 * ((this->attrib_comps[fld_dim].max_val + this->attrib_comps[fld_dim].min_val) + pt_norm * 
                 (this->attrib_comps[fld_dim].max_val - this->attrib_comps[fld_dim].min_val));
         };
 
-        // Convert the trait points from screen space to attribute space
         for(auto& trait: this->traits) {
             switch(trait.type) {
                 case TraitType::POINT: {
                     auto& tr_pt = std::get<Point>(trait.data);
-                   
                     auto x_f = get_pt_norm(tr_pt.x, 0);
-                    
                     if (attrib_comps.size() < 2) {
                         tr_pt.x = x_f;
                     } 
-                    
-                    if (attrib_comps.size() == 2) {
-                        tr_pt.y = get_pt_norm(tr_pt.y, 0);
+                    if (attrib_comps.size() >= 2) {
+                        tr_pt.y = get_pt_norm(tr_pt.y, 1);
                     } 
                     break;
                 }
+                case TraitType::PARALLEL_POINT: {
+                    auto& nd = std::get<NDPoint>(trait.data);
+                    if (nd.ys.size() != this->attrib_comps.size()) nd.ys.resize(this->attrib_comps.size(), 0.0f);
+                    for (size_t a = 0; a < this->attrib_comps.size(); ++a) {
+                        nd.ys[a] = get_pt_norm(nd.ys[a], a);
+                    }
+                    break;
+                }
                 case TraitType::RANGE: {
-                    if (std::get<Range>(trait.data).type == RangeType::INTERVAL) {
-                        auto& tr_int = std::get<Interval>(std::get<Range>(trait.data).range);
+                    auto& r = std::get<Range>(trait.data);
+                    if (r.type == RangeType::INTERVAL) {
+                        auto& tr_int = std::get<Interval>(r.range);
                         auto left = get_pt_norm(tr_int.left, 0);
                         auto right = get_pt_norm(tr_int.right, 0);
                         tr_int.left = std::min(left, right);
                         tr_int.right = std::max(left, right);
                     }
-                    else {
-                        auto& tr_poly = std::get<Polygon>(std::get<Range>(trait.data).range);
+                    else if (r.type == RangeType::POLYGON) {
+                        auto& tr_poly = std::get<Polygon>(r.range);
                         auto x_top = get_pt_norm(tr_poly.x_top, 0);
                         auto y_top = get_pt_norm(tr_poly.y_top, 1);
-
-                        // Our anchor point for the range would be the bottom left corner of the square
                         tr_poly.x_top = std::min(x_top, x_top + tr_poly.width);
                         tr_poly.y_top = std::min(y_top, y_top + tr_poly.height);
                         tr_poly.width = std::abs(tr_poly.width);
                         tr_poly.height = std::abs(tr_poly.height);
                     }
+                    else if (r.type == RangeType::HYPERBOX) {
+                        auto& hb = std::get<HyperBox>(r.range);
+                        if (hb.yranges.size() != this->attrib_comps.size()) hb.yranges.resize(this->attrib_comps.size(), {0.0f, 0.0f});
+                        for (size_t a = 0; a < this->attrib_comps.size(); ++a) {
+                            float a0 = get_pt_norm(hb.yranges[a].first, a);
+                            float a1 = get_pt_norm(hb.yranges[a].second, a);
+                            hb.yranges[a].first = std::min(a0, a1);
+                            hb.yranges[a].second = std::max(a0, a1);
+                        }
+                    }
                 }
             }
         }
 
-        // Important to make sure that build_distance_field doesn't call any opengl functions
         worker_thread = std::thread([this] {
             stop_requested.store(false, std::memory_order_release);
             compute_passed = true;
@@ -252,7 +264,7 @@ namespace MVF {
     void FieldEntity::cancel_dist_computation() {
        stop_requested.store(true, std::memory_order_release);
        complete_set_traits();
-       compute_passed = true;
+        compute_passed = true;
     }
         
     void FieldEntity::set_isovalue(float value) {
@@ -288,8 +300,6 @@ namespace MVF {
             return;
         }
 
-        // There are 2 entities here. SpatialRenderer::entity takes care of transforms, camera, lighting, bounding box etc
-        // Our entity is responsible for displaying computed distance field
         auto limits = Vector3f(SpatialRenderer::entity.model->nx, SpatialRenderer::entity.model->ny, SpatialRenderer::entity.model->nz);
 		Matrix4f mvp = projection * camera.view * SpatialRenderer::entity.world * SpatialRenderer::entity.scale_transform * SpatialRenderer::entity.init_transform;
 		Matrix4f mp = SpatialRenderer::entity.world * SpatialRenderer::entity.scale_transform * SpatialRenderer::entity.init_transform;

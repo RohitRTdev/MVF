@@ -15,7 +15,8 @@ class MainWindow : public Gtk::Window
 public:
     MainWindow();
     virtual ~MainWindow() = default;
-    
+    // notify UI that attribute-space trait selection (point line or range region) has completed
+    void on_traits_completed();
 
     friend MVF::RenderHandler;
     friend void advance_ui_clock(float fraction, bool complete);

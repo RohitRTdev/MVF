@@ -69,11 +69,4 @@ namespace MVF {
         }
     }
 
-    void AttribRenderer::clear_plot() {
-        scatter_plot.clear();
-        dist_plot_solid.clear();
-        dist_plot_lines.clear();
-        is_plot_visible = false;
-    }
-
 }    

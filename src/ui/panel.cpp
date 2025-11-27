@@ -160,7 +160,7 @@ void SpatialPanel::load_model(std::shared_ptr<MVF::VolumeData>& data) {
     handler->queue_render();
 }
 
-AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler), comp_list({}, [this]() { on_selection(); }) {
+AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler), comp_list({}, [this] { on_selection(); }) {
     set_label("Attribute panel");
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
 
@@ -208,14 +208,7 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler), 
 void AttributePanel::on_selection() {
     auto comps = comp_list.get_selected();
 
-    // If same as previous, don't do anything
     if (comps == selected_comps) {
-        return;
-    }
-
-    if (comps.size() > 2) {
-        MVF::app_warn("Please set only 2 or less components");
-        comp_list.set_active_mask(selected_comps);
         return;
     }
 
@@ -227,6 +220,7 @@ void AttributePanel::on_selection() {
         };
     }) | std::ranges::to<std::vector<MVF::AxisDesc>>();
     
+    // Enable trait selection whenever components are selected (including parallel coordinates)
     change_state({comps.size() > 0, false});
     handle_changed_selection = true;
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -e
 
 # Utility functions
@@ -15,13 +15,11 @@ case "$UNAME" in
     PLATFORM="linux"
     ;;
 esac
-
 info "Detected platform: $PLATFORM"
 
 # Compiler detection
 CXX=${CXX:-g++}
 command -v "$CXX" >/dev/null 2>&1 || err "g++ not found in PATH"
-
 info "Detected compiler: $CXX"
 
 # Check for C++23 support
@@ -33,9 +31,7 @@ cat > "$TMPFILE" <<'EOF'
 #endif
 int main() { return 0; }
 EOF
-
 OUTFILE="$(mktemp testoutXXXX.exe)"
-
 if "$CXX" -std=c++23 -o "$OUTFILE" "$TMPFILE" >"$OUTFILE" 2>&1; then
   info "Compiler supports C++23"
 else
@@ -51,18 +47,15 @@ int main() {
   | std::ranges::to<std::vector>();
 }
 EOF
-
 if "$CXX" -std=c++23 -o "$OUTFILE" "$TMPFILE" >"$OUTFILE" 2>&1; then
   info "Compiler supports <ranges> library"
 else
   err "No support found for <ranges> library. Please upgrade your compiler."
 fi
-
 rm -f "$TMPFILE" "$OUTFILE"
 
 # pkg-config and dependencies
 command -v pkg-config >/dev/null 2>&1 || err "pkg-config not found"
-
 info "Checking for gtkmm >= 4.0..."
 pkg-config --exists 'gtkmm-4.0 >= 4.0' || err "gtkmm >= 4.0 is required"
 info "Found gtkmm-4.0"
@@ -72,7 +65,6 @@ pkg-config --exists 'epoxy' || err "libepoxy is required"
 info "Found libepoxy"
 
 # Check for OpenGL headers
-# For now, we just check these locations. Feel free to add more...
 if [ "$PLATFORM" = "windows" ]; then
   GL_HEADERS="/mingw64/include/GL/gl.h"
 else
@@ -90,11 +82,32 @@ done
 
 [ $FOUND_GL -eq 1 ] || err "OpenGL headers not found!"
 
+# -------------------------
+#   VTK SUPPORT
+# -------------------------
+info "Checking for VTK..."
+if [ "$PLATFORM" = "windows" ]; then
+    VTK_INC_DIR="C:/msys64/mingw64/include/vtk"
+    VTK_LIB_DIR="C:/msys64/mingw64/lib/vtk/hierarchy/VTK"
+else
+    VTK_INC_DIR="/usr/include/vtk"
+    VTK_LIB_DIR="/usr/lib"
+fi
+
+if [ -d "$VTK_INC_DIR" ] && [ -d "$VTK_LIB_DIR" ]; then
+    info "✓ Found VTK include: $VTK_INC_DIR"
+    info "✓ Found VTK lib:     $VTK_LIB_DIR"
+else
+    err "VTK not found! Please update VTK paths in configure script."
+fi
+
+VTK_LIBS="-lvtkCommonCore -lvtkCommonDataModel -lvtkCommonSystem -lvtkCommonMisc -lvtkViewsCore -lvtkRenderingOpenGL2 -lvtkViewsInfovis -lvtkRenderingCore -lvtkInteractionStyle -lvtksys -lvtkChartsCore -lvtkRenderingContext2D -lvtkRenderingContextOpenGL2 -lvtkInteractionWidgets -lvtkViewsContext2D -lvtkRenderingFreeType -lvtkRenderingUI"
+
 # Build flags
 GTK_CFLAGS=$(pkg-config --cflags gtkmm-4.0 epoxy)
 GTK_LIBS=$(pkg-config --libs gtkmm-4.0 epoxy)
-COMMON_FLAGS="-Wall -std=c++23 -MMD -MP -Isrc/include $GTK_CFLAGS"
-LINK_FLAGS="$GTK_LIBS"
+COMMON_FLAGS="-Wall -std=c++23 -MMD -MP -Isrc/include -I$VTK_INC_DIR $GTK_CFLAGS"
+LINK_FLAGS="$GTK_LIBS -L$VTK_LIB_DIR $VTK_LIBS"
 
 # Makefile generation
 cat > Makefile <<'EOF'

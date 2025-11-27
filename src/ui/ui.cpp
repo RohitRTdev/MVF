@@ -1,12 +1,20 @@
 #include <iostream>
 #include "ui.h"
-#include "vtk.h"
 #include "error.h"
 #include "attrib.h"
 
 using namespace Gtk;
 
 MainWindow* global_ui_inst = nullptr;
+
+void MainWindow::on_traits_completed() {
+    // if feature space visible, defer until domain space view is active
+    if (is_feature_space_visible) {
+        trait_handler_pending = true;
+    } else {
+        attrib_panel.set_button_active();
+    }
+}
 
 // This is a side channel generic function any entity can use to communicate to UI when there 
 // is need for asynchronous computation
@@ -214,12 +222,7 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
     auto mouse_click = GestureClick::create();
     mouse_click->signal_pressed().connect([this] (int, double, double) {
         if (attrib_handler.handle_traits) {
-            if (is_feature_space_visible) {
-                trait_handler_pending = true;
-            }
-            else {
-                attrib_panel.set_button_active();
-            }
+            on_traits_completed();
             attrib_handler.handle_traits = false;
         }
     });
