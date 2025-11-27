@@ -51,7 +51,7 @@ namespace MVF {
     
     struct Trait {
         TraitType type;
-        std::variant<Point, Range> data;
+        std::variant<Point, Range, NDPoint> data;
         size_t color_id;
     };
 

@@ -128,8 +128,6 @@ namespace MVF {
         std::string hover_text;
         void setup_buffers();
         size_t last_chosen_id = 0;
-
-        void setup_buffers(); 
         void setup_traits();
         void generate_scatter_plot();
         void generate_freq_distribution();

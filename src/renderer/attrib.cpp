@@ -404,7 +404,8 @@ namespace MVF {
             float xA = x0 + axis * dx; float xB = x0 + (axis+1) * dx;
             auto [a0, a1] = axis_world_ranges[axis];
             auto [b0, b1] = axis_world_ranges[axis+1];
-            if (a0 > a1) std::swap(a0, a1); if (b0 > b1) std::swap(b0, b1);
+            if (a0 > a1) std::swap(a0, a1);
+            if (b0 > b1) std::swap(b0, b1);
             parallel_region_lines_vertices.push_back(Vector2f(xA, a0)); parallel_region_lines_vertices.push_back(Vector2f(xB, b0));
             parallel_region_lines_vertices.push_back(Vector2f(xA, a1)); parallel_region_lines_vertices.push_back(Vector2f(xB, b1));
             parallel_region_lines_vertices.push_back(Vector2f(xA, a0)); parallel_region_lines_vertices.push_back(Vector2f(xA, a1));
@@ -481,36 +482,19 @@ namespace MVF {
                 glDrawArrays(GL_LINES, 0, parallel_highlight_lines_vertices.size());
             }
             if (has_pending_markers && !parallel_pending_marker_positions.empty()) {
-                const Vector4f marker_color(1, 0, 0, 1);
                 auto pipeline_marker = reinterpret_cast<MarkerPipeline*>(pipelines[static_cast<int>(PipelineType::MARKER)]);
                 glUseProgram(pipeline_marker->shader_program);
-                glUniform4fv(pipeline_marker->uColor, 1, (float*)&marker_color);
+                glUniform1f(pipeline_marker->uAlpha, 1.0f);
                 glBindVertexArray(vao_parallel_marker);
                 glDrawArraysInstanced(GL_TRIANGLES, 0, marker.vertices.size(), static_cast<GLsizei>(parallel_pending_marker_positions.size()));
             }
         }
-        if (descriptors.size() <= 2) {
-            auto point_traits = std::ranges::distance(traits | std::views::filter([](auto& tr) {return tr.type == TraitType::POINT; }));
-            if (point_traits) {
-                const Vector4f marker_color(1, 0, 0, 1); auto pipeline_marker = reinterpret_cast<MarkerPipeline*>(pipelines[static_cast<int>(PipelineType::MARKER)]);
-                glUseProgram(pipeline_marker->shader_program); glUniform4fv(pipeline_marker->uColor, 1, (float*)&marker_color);
-                glBindVertexArray(vao_marker); glDrawArraysInstanced(GL_TRIANGLES, 0, marker.vertices.size(), point_traits);
-            }
-            if (num_interval_vertices) {
-                const Vector4f interval_color(1.0f, 0.8f, 0, 0.8f); glUniform4fv(pipeline_axis->uColor, 1, (float*)&interval_color); glBindVertexArray(vao_interval); glDrawArrays(GL_TRIANGLES, 0, num_interval_vertices);
-            }
-            else if (num_range_tri_vertices) {
-                Vector4f line_color(1.0f, 0.8f, 0, 0.8f); glUniform4fv(pipeline_axis->uColor, 1, (float*)&line_color); glBindVertexArray(vao_polyline); glDrawArrays(GL_TRIANGLES, 0, num_range_tri_vertices);
-                line_color = Vector4f(1.0f, 0.2f, 0, 1.0f); glUniform4fv(pipeline_axis->uColor, 1, (float*)&line_color); glBindVertexArray(vao_polypoint); glDrawArrays(GL_POINTS, 0, num_range_pt_vertices);
-            }
-        }
-
+        
         // Draw the traits
         auto point_traits = std::ranges::distance(traits | std::views::filter([] (auto& trait) {
             return trait.type == TraitType::POINT;
         }));
 
-        // Point traits will be drawn on bottom layer
         if (point_traits) {
             auto pipeline_marker = reinterpret_cast<MarkerPipeline*>(pipelines[static_cast<int>(PipelineType::MARKER)]);
             glUseProgram(pipeline_marker->shader_program);
@@ -530,13 +514,10 @@ namespace MVF {
             glUseProgram(pipeline_color->shader_program);
             glUniform1f(pipeline_color->uAlpha, 0.5f);
 
-            // First draw the range rectangle
             glBindVertexArray(vao_polyline);
             glDrawArrays(GL_TRIANGLES, 0, num_range_tri_vertices);
 
             glUniform1f(pipeline_color->uAlpha, 1.0f);
-        
-            // Now, draw the corner points
             glBindVertexArray(vao_polypoint);
             glDrawArrays(GL_POINTS, 0, num_range_pt_vertices);
         }
@@ -587,10 +568,14 @@ namespace MVF {
         std::get<Polygon>(std::get<Range>(last_trait.data).range).height = height;
         std::get<Polygon>(std::get<Range>(last_trait.data).range).mesh = PolySelector(saved_x_top, saved_y_top, 
             width, height, global_color_pallete[last_trait.color_id]);
+        setup_traits();
+    }
+    
+    void AttribRenderer::set_point_trait(float x) { set_point_trait(x, 0); }
 
     void AttribRenderer::set_point_trait(float x, float y) {
         if (descriptors.size() < 1 || std::abs(x) >= AXIS_LENGTH / 2 || std::abs(y) >= AXIS_LENGTH / 2) return;
-        traits.push_back(Trait {.type = TraitType::POINT, .data = Point{.x = x, .y = y}});
+        traits.push_back(Trait {.type = TraitType::POINT, .data = Point{.x = x, .y = y, .color = global_color_pallete[last_chosen_id]}, .color_id = get_color_id()});
         setup_traits();
     }
     
@@ -615,14 +600,6 @@ namespace MVF {
         float sx = (ndc_x * 0.5f + 0.5f) * viewport_width;
         float sy = (0.5f - ndc_y * 0.5f) * viewport_height;
         return { sx, sy };
-    void AttribRenderer::set_point_trait(float x, float y) {
-        if (descriptors.size() < 1 || std::abs(x) >= AXIS_LENGTH / 2 || std::abs(y) >= AXIS_LENGTH / 2) {
-            return;
-        }
-        
-        traits.push_back(Trait {.type = TraitType::POINT, .data = Point{.x = x, .y = y, .color = global_color_pallete[last_chosen_id]}, .color_id = get_color_id()});
-
-        setup_traits();
     }
 
     void AttribRenderer::on_mouse_move(double mx, double my) {

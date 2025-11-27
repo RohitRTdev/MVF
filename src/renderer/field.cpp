@@ -176,11 +176,7 @@ namespace MVF {
                         }
                     }
                 }
-                min_dist = std::min(dist, min_dist);
-                        }
-                    }
-                }
-                
+               
                 if (dist < min_dist) {
                     min_dist = dist;
                     sel_trait = &trait; 

@@ -71,7 +71,6 @@ case "$UNAME" in
 esac
 info "Detected platform: $PLATFORM"
 
-<<<<<<< HEAD
 # Compiler detection
 CXX=${CXX:-g++}
 command -v "$CXX" >/dev/null 2>&1 || err "g++ not found in PATH"
@@ -113,29 +112,7 @@ rm -f "$TMPFILE" "$OUTFILE"
 command -v pkg-config >/dev/null 2>&1 || err "pkg-config not found"
 info "Checking for gtkmm >= 4.0..."
 pkg-config --exists 'gtkmm-4.0 >= 4.0' || err "gtkmm >= 4.0 is required"
-=======
-# Feel free to add more
-CXX_LIST="g++ g++-14 NULL"
 
-# Testing available compilers
-for compiler in $CXX_LIST; do 
-  if [ "$compiler" = "NULL" ]; then
-    err "No compatible compilers found..." 1
-  fi
-  info "Testing compiler $compiler"
-  if check_compiler_support $compiler; then
-    CXX=$compiler
-    break
-  fi
-
-done
-
-# pkg-config and dependencies
-command -v pkg-config >/dev/null 2>&1 || err "pkg-config not found" 1
-
-info "Checking for gtkmm-4.0..."
-pkg-config --exists 'gtkmm-4.0 >= 4.10' || err "gtkmm >= 4.10 is required" 1
->>>>>>> a568ab8097e5d7a708f716b62f6c2f52c0b0df8f
 info "Found gtkmm-4.0"
 
 info "Checking for epoxy..."
