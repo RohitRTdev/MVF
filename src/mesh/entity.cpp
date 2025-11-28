@@ -324,7 +324,7 @@ namespace MVF {
         // Upload scalar values as a R8 texture normalized 0..1
         auto it = model->scalars.find(desc.field);
         if (it == model->scalars.end()) return;
-        auto& vec = std::get<0>(it->second);
+        auto& vec = it->second;
         // Determine slice dimensions
         int w=0,h=0; int nx=model->nx, ny=model->ny, nz=model->nz;
         if (desc.axis == 2) { w = nx; h = ny; }
@@ -362,7 +362,7 @@ namespace MVF {
     void VolumeEntity::update_dvr_resources() {
         auto& desc = std::get<DVRDesc>(type.data);
         auto it = model->scalars.find(desc.field); if (it==model->scalars.end()) return;
-        auto& vec = std::get<0>(it->second); 
+        auto& vec = it->second; 
         int nx=model->nx, ny=model->ny, nz=model->nz; dvr_buffer.nx=nx; dvr_buffer.ny=ny; dvr_buffer.nz=nz;
         std::vector<uint8_t> vol(nx*ny*nz);
         float minv=std::numeric_limits<float>::max(), maxv=-std::numeric_limits<float>::max();

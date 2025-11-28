@@ -151,9 +151,9 @@ namespace MVF {
                         continue;
                     }
                     auto x = model->origin.x + k * model->spacing.x;
-                    auto u_pt = std::get<0>(model->scalars[field1])[i * model->ny * model->nx + j * model->nx + k];  
-                    auto v_pt = std::get<0>(model->scalars[field2])[i * model->ny * model->nx + j * model->nx + k];  
-                    auto w_pt = field3.empty() ? 0 : std::get<0>(model->scalars[field3])[i * model->ny * model->nx + j * model->nx + k];  
+                    auto u_pt = model->scalars[field1][i * model->ny * model->nx + j * model->nx + k];  
+                    auto v_pt = model->scalars[field2][i * model->ny * model->nx + j * model->nx + k];  
+                    auto w_pt = field3.empty() ? 0 : model->scalars[field3][i * model->ny * model->nx + j * model->nx + k];  
                     points.push_back(GlyphInstance{Vector3f(x, y, z), Vector3f(u_pt, v_pt, w_pt)});
 
                     max_wgt = std::max(max_wgt, wgt_fn(u_pt, v_pt, w_pt));

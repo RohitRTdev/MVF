@@ -14,7 +14,7 @@ namespace MVF {
     enum class TraitType {
         POINT,
         RANGE,
-        PARALLEL_POINT // N-D point selected across parallel axes
+        PARALLEL_POINT 
     };
 
     // N-D point for parallel coordinates selection (stores world-space Y per axis initially)

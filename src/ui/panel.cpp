@@ -215,7 +215,9 @@ AttributePanel::AttributePanel(MVF::AttribHandler* handler) : handler(handler), 
         auto text = trait_sel.get_active_text();
 
         auto attrib_handler = static_cast<MVF::AttribHandler*>(this->handler);
+        this->handler->make_current();
         attrib_handler->set_point_trait_mode(text == "Point");
+        attrib_handler->queue_render();
     });  
 
     comp_list.set_sensitive(false);
@@ -259,6 +261,7 @@ void AttributePanel::on_selection() {
     change_state({comps.size() > 0, false});
     handle_changed_selection = true;
 
+    handler->make_current();
     handler->set_field_info(desc);
     handler->queue_render();
 }

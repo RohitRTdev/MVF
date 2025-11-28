@@ -10,7 +10,7 @@ namespace MVF {
 
         constexpr size_t samples = 20, sample_period = 1;
         constexpr float scale_factor = 0.5f;
-        auto& field1 = std::get<0>(data->scalars[descriptors[0].desc.comp_name]);  
+        auto& field1 = data->scalars[descriptors[0].desc.comp_name];  
     
         auto get_bin_idx = [samples, this] (float val) {
             return std::min(samples - 1, 
@@ -48,8 +48,8 @@ namespace MVF {
 
         constexpr size_t sample_period = 100;
 
-        auto& field1 = std::get<0>(data->scalars[descriptors[0].desc.comp_name]);  
-        auto& field2 = std::get<0>(data->scalars[descriptors[1].desc.comp_name]);  
+        auto& field1 = data->scalars[descriptors[0].desc.comp_name];  
+        auto& field2 = data->scalars[descriptors[1].desc.comp_name];  
 
         const auto num_points = field1.size() / sample_period; 
 #ifdef MVF_DEBUG

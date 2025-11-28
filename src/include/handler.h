@@ -59,11 +59,11 @@ namespace MVF {
         bool activate_range_selection = false; 
         HoverOverlay mouse_overlay;
         std::vector<std::string> field_comps;
-        void on_mouse_click(int n_press, double x, double y);
-        // parallel selection state
-        std::vector<float> parallel_point_selection; // world y per axis
-        std::vector<std::pair<float,float>> parallel_range_selection; // world [y1,y2] per axis
+        std::vector<float> parallel_point_selection;
+        std::vector<std::pair<float,float>> parallel_range_selection;
         std::vector<bool> range_has_first;
+        
+        void on_mouse_click(int n_press, double x, double y);
     };
 }
 

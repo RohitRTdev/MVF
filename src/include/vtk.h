@@ -17,7 +17,7 @@ namespace MVF {
         int nx, ny, nz;
         Vector3f origin;
         Vector3f spacing;
-        std::unordered_map<std::string, std::tuple<std::vector<float>, int>> scalars;
+        std::unordered_map<std::string, std::vector<float>> scalars;
         ~VolumeData(); // always declare; debug print guarded in cpp
     };
 

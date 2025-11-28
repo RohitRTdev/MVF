@@ -103,7 +103,7 @@ namespace MVF {
             // Get the point in attribute space for this point in domain
             std::vector<float> pt(attrib_comps.size());
             for (size_t dim = 0; dim < attrib_comps.size(); dim++) {
-                auto& fld = std::get<0>(geometry_entity->model->scalars[attrib_comps[dim].desc.comp_name]);
+                auto& fld = geometry_entity->model->scalars[attrib_comps[dim].desc.comp_name];
                 pt[dim] = fld[i];
             }
 
@@ -160,12 +160,19 @@ namespace MVF {
                             auto& hb = std::get<HyperBox>(r.range);
                             float dsum = 0.0f;
                             size_t m = std::min(hb.yranges.size(), pt.size());
-                            for (size_t a = 0; a < m; ++a) {
+                            for (size_t a = 0; a < m; a++) {
                                 float a0 = hb.yranges[a].first;
                                 float a1 = hb.yranges[a].second;
-                                if (a0 > a1) std::swap(a0, a1);
-                                if (pt[a] < a0) { float d = a0 - pt[a]; dsum += d * d; }
-                                else if (pt[a] > a1) { float d = pt[a] - a1; dsum += d * d; }
+                                if (a0 > a1) 
+                                    std::swap(a0, a1);
+                                if (pt[a] < a0) { 
+                                    float d = a0 - pt[a];
+                                    dsum += d * d;
+                                }
+                                else if (pt[a] > a1) { 
+                                    float d = pt[a] - a1; 
+                                    dsum += d * d; 
+                                }
                                 else { /* inside -> zero */ }
                             }
                             dist = dsum;
@@ -183,13 +190,6 @@ namespace MVF {
             field[i] = min_dist;
             color_field[i] = global_color_pallete[sel_trait->color_id];
         }
-
-        //// Normalize once (guard against divide by zero)
-        //if (max_dist > 0.0f) {
-        //    field = field | std::views::transform([max_dist] (float val) { return val / max_dist; }) | std::ranges::to<std::vector<float>>();
-        //} else {
-        //    field = field | std::views::transform([] (float) { return 0.0f; }) | std::ranges::to<std::vector<float>>();
-        //}
 
         // Normalize the field
         field = field |
@@ -315,8 +315,8 @@ namespace MVF {
     }
 
     void FieldEntity::cancel_dist_computation() {
-       stop_requested.store(true, std::memory_order_release);
-       complete_set_traits();
+        stop_requested.store(true, std::memory_order_release);
+        complete_set_traits();
         compute_passed = true;
     }
         

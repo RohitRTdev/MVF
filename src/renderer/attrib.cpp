@@ -48,7 +48,6 @@ namespace MVF {
         glGenVertexArrays(1, &vao_parallel_lines_highlight);
         glGenVertexArrays(1, &vao_parallel_lines_region);
         glGenVertexArrays(1, &vao_parallel_region_fill);
-        glGenVertexArrays(1, &vao_parallel_marker);
 
         glGenBuffers(1, &vbo_x_axis);
         glGenBuffers(1, &vbo_y_axis);
@@ -65,7 +64,6 @@ namespace MVF {
         glGenBuffers(1, &vbo_parallel_lines_highlight);
         glGenBuffers(1, &vbo_parallel_lines_region);
         glGenBuffers(1, &vbo_parallel_region_fill);
-        glGenBuffers(1, &vbo_parallel_marker_pos);
         
         glBindVertexArray(vao_x_axis);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_x_axis);
@@ -137,40 +135,60 @@ namespace MVF {
         glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_axes);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), (void*)0);
+
         glBindVertexArray(vao_parallel_lines);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_lines);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), (void*)0);
+
         glBindVertexArray(vao_parallel_lines_highlight);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_lines_highlight);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), (void*)0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)sizeof(Vector2f));
+
         glBindVertexArray(vao_parallel_lines_region);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_lines_region);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), (void*)0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)sizeof(Vector2f));
+
         glBindVertexArray(vao_parallel_region_fill);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_region_fill);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), (void*)0);
-
-        glBindVertexArray(vao_parallel_marker);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_marker);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), (void*)0);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_marker_pos);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)0);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vector2f), 0);
-        glVertexAttribDivisor(1, 1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Point), (void*)sizeof(Vector2f));
 
         glBindVertexArray(0);
+        setup_parallel_coordinates();
+        setup_pending_markers();
         setup_traits();
         setup_plot();
 #ifdef MVF_DEBUG
         std::cout << "Created attribute space static mesh buffers..." << std::endl;
 #endif
     }
+   
+    void AttribRenderer::setup_pending_markers() {
+        if (parallel_pending_marker_positions.empty()) {
+            return;
+        }
+        
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_marker_pos);
+        glBufferData(GL_ARRAY_BUFFER, parallel_pending_marker_positions.size() * sizeof(Point), parallel_pending_marker_positions.data(), GL_DYNAMIC_DRAW);
+    }
     
+    void AttribRenderer::setup_parallel_coordinates() {
+        if (parallel_axes_vertices.empty()) {
+            return;
+        }
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_axes);
+        glBufferData(GL_ARRAY_BUFFER, parallel_axes_vertices.size() * sizeof(Vector2f), parallel_axes_vertices.data(), GL_STATIC_DRAW);
+    }
+
     void AttribRenderer::setup_plot() {
         if (scatter_plot.size()) {
             glBindBuffer(GL_ARRAY_BUFFER, vbo_scatterplot);
@@ -183,18 +201,8 @@ namespace MVF {
             glBufferData(GL_ARRAY_BUFFER, dist_plot_lines.size() * sizeof(Vector2f), dist_plot_lines.data(), GL_DYNAMIC_DRAW);
         }
         else if (parallel_lines_vertices.size()) {
-            glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_axes);
-            glBufferData(GL_ARRAY_BUFFER, parallel_axes_vertices.size() * sizeof(Vector2f), parallel_axes_vertices.data(), GL_STATIC_DRAW);
             glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_lines);
             glBufferData(GL_ARRAY_BUFFER, parallel_lines_vertices.size() * sizeof(Vector2f), parallel_lines_vertices.data(), GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_lines_highlight);
-            glBufferData(GL_ARRAY_BUFFER, parallel_highlight_lines_vertices.size() * sizeof(Vector2f), parallel_highlight_lines_vertices.data(), GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_lines_region);
-            glBufferData(GL_ARRAY_BUFFER, parallel_region_lines_vertices.size() * sizeof(Vector2f), parallel_region_lines_vertices.data(), GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_region_fill);
-            glBufferData(GL_ARRAY_BUFFER, parallel_region_fill_vertices.size() * sizeof(Vector2f), parallel_region_fill_vertices.data(), GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_marker_pos);
-            glBufferData(GL_ARRAY_BUFFER, parallel_pending_marker_positions.size() * sizeof(Vector2f), parallel_pending_marker_positions.data(), GL_DYNAMIC_DRAW);
         }
     }
     
@@ -205,14 +213,20 @@ namespace MVF {
         if (!descriptors.size()) {
             throw std::runtime_error("setup_traits() called when descriptors.size() == 0");
         }
-        auto vertices_point = traits | std::views::filter([] (auto& trait) {
-            return trait.type == TraitType::POINT;
-        }) | std::views::transform([] (auto& trait) {return std::get<Point>(trait.data);} )
-        | std::ranges::to<std::vector>();
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_marker_pos);
-        glBufferData(GL_ARRAY_BUFFER, vertices_point.size() * sizeof(Point), vertices_point.data(), GL_DYNAMIC_DRAW);
+        
+        // Draw point traits for 1 and 2d case
+        if (descriptors.size() <= 2) {
+            auto vertices_point = traits | std::views::filter([] (auto& trait) {
+                return trait.type == TraitType::POINT;
+            }) | std::views::transform([] (auto& trait) {return std::get<Point>(trait.data);} )
+            | std::ranges::to<std::vector>();
+            glBindBuffer(GL_ARRAY_BUFFER, vbo_marker_pos);
+            glBufferData(GL_ARRAY_BUFFER, vertices_point.size() * sizeof(Point), vertices_point.data(), GL_DYNAMIC_DRAW);
+        }
+
         switch(descriptors.size()) {
             case 1: {
+                // Draw range trait for 1d case
                 auto vertices_interval = traits | std::views::filter([] (auto& trait) {
                     return trait.type == TraitType::RANGE && std::get<Range>(trait.data).type == RangeType::INTERVAL;
                 }) | std::views::transform([] (auto& trait) {return std::get<Interval>(std::get<Range>(trait.data).range).mesh.vertices;})
@@ -242,6 +256,22 @@ namespace MVF {
                 num_range_pt_vertices = pt_vertices.size();
                 break;
             }
+            // Parallel coordinates case
+            default: {
+                // Draw point trait for >2d case
+                if (!parallel_highlight_lines_vertices.empty()) {
+                    glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_lines_highlight);
+                    glBufferData(GL_ARRAY_BUFFER, parallel_highlight_lines_vertices.size() * sizeof(Point), parallel_highlight_lines_vertices.data(), GL_DYNAMIC_DRAW);
+                }
+              
+                // Draw range trait for >2d case
+                if (!parallel_region_lines_vertices.empty()) {
+                    glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_lines_region);
+                    glBufferData(GL_ARRAY_BUFFER, parallel_region_lines_vertices.size() * sizeof(Point), parallel_region_lines_vertices.data(), GL_DYNAMIC_DRAW);
+                    glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_region_fill);
+                    glBufferData(GL_ARRAY_BUFFER, parallel_region_fill_vertices.size() * sizeof(Point), parallel_region_fill_vertices.data(), GL_DYNAMIC_DRAW);
+                }
+            }
         }
     }
     
@@ -253,26 +283,31 @@ namespace MVF {
     }
     
     void AttribRenderer::set_attrib_space_axis(const std::vector<AxisDesc>& ds) {
-        if (!data) return;
+        if (!data || ds.empty()) {
+            throw std::runtime_error("set_attrib_axis() called with ds.size() == 0 || data == null");
+        };
+        
         descriptors.clear();
         clear_traits();
         clear_plot();
         for (auto& val: ds) {
             auto it = data->scalars.find(val.comp_name);
             if (it == data->scalars.end()) continue;
-            auto& comp = std::get<0>(it->second);
+            auto& comp = it->second;
             auto [mn, mx] = std::minmax_element(comp.begin(), comp.end());
+        #ifdef MVF_DEBUG
+            std::cout << std::format("Field-{}: min_val={:.2f}, max_val={:.2f}", val.comp_name, *mn, *mx) << std::endl;
+        #endif 
+          
             descriptors.push_back(AxisDescMeta{.desc = val, .min_val = *mn, .max_val = *mx});
         }
         if (descriptors.size() == 1) generate_freq_distribution();
         else if (descriptors.size() == 2) generate_scatter_plot();
+        else generate_parallel_coordinates();
     }
            
     void AttribRenderer::enable_plot(bool enable) {
         if (enable) {
-            if (descriptors.size() > 2) {
-                generate_parallel_coordinates();
-            }
             setup_plot();
         }
         is_plot_visible = enable;
@@ -282,135 +317,125 @@ namespace MVF {
         return {descriptors, traits};
     }
 
-    void AttribRenderer::set_sample_period(size_t period) {
-        if (period == 0) period = 1;
-        sample_period = period;
-        if (is_plot_visible && descriptors.size() > 2) {
-            generate_parallel_coordinates();
-            setup_plot();
-        }
-    }
-
     void AttribRenderer::clear_traits() {
         traits.clear();
         num_interval_vertices = 0;
         num_range_pt_vertices = 0;
         num_range_tri_vertices = 0;
-        // clear parallel selections
         parallel_highlight_lines_vertices.clear();
         parallel_region_lines_vertices.clear();
         parallel_region_fill_vertices.clear();
         parallel_pending_marker_positions.clear();
-        has_pending_markers = false;
-    }
-
-    void AttribRenderer::cycle_sample_period() {
-        static const size_t modes[] = {1, 100, 500, 1000};
-        auto it = std::find(std::begin(modes), std::end(modes), sample_period);
-        if (it == std::end(modes)) {
-            sample_period = modes[0];
-        } else {
-            size_t idx = (std::distance(std::begin(modes), it) + 1) % (sizeof(modes)/sizeof(modes[0]));
-            sample_period = modes[idx];
-        }
-        if (is_plot_visible && descriptors.size() > 2) {
-            generate_parallel_coordinates();
-            setup_plot();
-        }
     }
 
     void AttribRenderer::generate_parallel_coordinates() {
         if (descriptors.size() < 3 || !data) {
-            parallel_axes_vertices.clear();
-            parallel_lines_vertices.clear();
-            return;
+            throw std::runtime_error("generate_parallel_coordinates() called with descriptors.size() < 3");
         }
         parallel_axes_vertices.clear();
         parallel_lines_vertices.clear();
+
+        constexpr size_t sample_period = 1000;
+
         float span = AXIS_LENGTH; 
         size_t n = descriptors.size();
         float dx = span / (n - 1);
         float x0 = -AXIS_LENGTH / 2; 
+
         for (size_t i = 0; i < n; ++i) {
             float x = x0 + i * dx;
             parallel_axes_vertices.push_back(Vector2f(x, -AXIS_LENGTH/2));
             parallel_axes_vertices.push_back(Vector2f(x, AXIS_LENGTH/2));
         }
-        size_t total = std::get<0>(data->scalars[descriptors[0].desc.comp_name]).size();
-        if (total == 0) return;
+        
+        size_t total = data->scalars[descriptors[0].desc.comp_name].size();
+       
         for (size_t idx = 0; idx < total; idx += sample_period) {
-            for (size_t axis = 0; axis + 1 < n; ++axis) {
-                auto &compA = std::get<0>(data->scalars[descriptors[axis].desc.comp_name]);
-                auto &compB = std::get<0>(data->scalars[descriptors[axis+1].desc.comp_name]);
+            for (size_t axis = 0; axis < n - 1; axis++) {
+                auto &compA = data->scalars[descriptors[axis].desc.comp_name];
+                auto &compB = data->scalars[descriptors[axis + 1].desc.comp_name];
                 float valA = compA[idx];
                 float valB = compB[idx];
                 float normA = 2 * (valA - descriptors[axis].min_val) / (descriptors[axis].max_val - descriptors[axis].min_val) - 1;
-                float normB = 2 * (valB - descriptors[axis+1].min_val) / (descriptors[axis+1].max_val - descriptors[axis+1].min_val) - 1;
+                float normB = 2 * (valB - descriptors[axis + 1].min_val) / (descriptors[axis + 1].max_val - descriptors[axis + 1].min_val) - 1;
                 float xA = x0 + axis * dx;
-                float xB = x0 + (axis+1) * dx;
-                float yA = std::clamp(normA, -1.0f, 1.0f) * (AXIS_LENGTH/2);
-                float yB = std::clamp(normB, -1.0f, 1.0f) * (AXIS_LENGTH/2);
+                float xB = x0 + (axis + 1) * dx;
+                float yA = normA * (AXIS_LENGTH / 2);
+                float yB = normB * (AXIS_LENGTH / 2);
                 parallel_lines_vertices.push_back(Vector2f(xA, yA));
                 parallel_lines_vertices.push_back(Vector2f(xB, yB));
             }
         }
+        setup_parallel_coordinates();
     }
 
-    // pending markers helpers
     void AttribRenderer::clear_parallel_pending_markers() {
         parallel_pending_marker_positions.clear();
-        has_pending_markers = false;
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_marker_pos);
-        glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
-    }
-    void AttribRenderer::add_parallel_pending_marker(size_t axis_index, float world_y) {
-        if (descriptors.size() < 3) return;
-        float span = AXIS_LENGTH; size_t n = descriptors.size(); float dx = span / (n - 1); float x0 = -AXIS_LENGTH / 2;
-        float x = x0 + axis_index * dx;
-        parallel_pending_marker_positions.push_back(Vector2f(x, world_y));
-        has_pending_markers = true;
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_marker_pos);
-        glBufferData(GL_ARRAY_BUFFER, parallel_pending_marker_positions.size() * sizeof(Vector2f), parallel_pending_marker_positions.data(), GL_DYNAMIC_DRAW);
     }
 
-    // --- Parallel selections ---
-    void AttribRenderer::select_parallel_line_by_points(const std::vector<float>& axis_world_ys) {
-        if (descriptors.size() < 3 || !data) return;
-        size_t n = descriptors.size();
-        if (axis_world_ys.size() != n) return;
-        // append user-selected polyline segments; keep old highlights
-        float span = AXIS_LENGTH; size_t nAx = n; float dx = span / (nAx - 1); float x0 = -AXIS_LENGTH / 2;
-        for (size_t axis = 0; axis + 1 < nAx; ++axis) {
-            float xA = x0 + axis * dx; float xB = x0 + (axis+1) * dx;
-            float yA = std::clamp(axis_world_ys[axis] / (AXIS_LENGTH/2.0f), -1.0f, 1.0f) * (AXIS_LENGTH/2.0f);
-            float yB = std::clamp(axis_world_ys[axis+1] / (AXIS_LENGTH/2.0f), -1.0f, 1.0f) * (AXIS_LENGTH/2.0f);
-            parallel_highlight_lines_vertices.push_back(Vector2f(xA, yA));
-            parallel_highlight_lines_vertices.push_back(Vector2f(xB, yB));
+    void AttribRenderer::add_parallel_pending_marker(size_t axis_index, float world_y) {
+        if (descriptors.size() < 3) {
+            throw std::runtime_error("add_parallel_pending_marker() called with descriptors.size() < 3");
         }
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_lines_highlight);
-        glBufferData(GL_ARRAY_BUFFER, parallel_highlight_lines_vertices.size() * sizeof(Vector2f), parallel_highlight_lines_vertices.data(), GL_DYNAMIC_DRAW);
+
+        const auto pending_marker_color = Vector3f(0, 0, 0);
+        float span = AXIS_LENGTH; size_t n = descriptors.size(); float dx = span / (n - 1); float x0 = -AXIS_LENGTH / 2;
+        float x = x0 + axis_index * dx;
+        parallel_pending_marker_positions.push_back(Point{x, world_y, pending_marker_color});
+        setup_pending_markers();
+    }
+
+    void AttribRenderer::select_parallel_line_by_points(const std::vector<float>& axis_world_ys) {
+        if (descriptors.size() < 3 || !data) {
+            throw std::runtime_error("selected_parallel_line_by_points() called with descriptors.size() < 3");
+        }
+
+        size_t n = descriptors.size();
+        if (axis_world_ys.size() != n) {
+            throw std::runtime_error("select_parallel_line_by_points() called with axis_world_ys.size() != n");
+        }
+
+        // Append user-selected polyline segments; keep old highlights
+        auto color_id = get_color_id();
+        auto& color = global_color_pallete[color_id];
+        float span = AXIS_LENGTH; float dx = span / (n - 1); float x0 = -AXIS_LENGTH / 2;
+        for (size_t axis = 0; axis < n - 1; axis++) {
+            float xA = x0 + axis * dx; 
+            float xB = x0 + (axis + 1) * dx;
+            parallel_highlight_lines_vertices.push_back(Point{xA, axis_world_ys[axis], color});
+            parallel_highlight_lines_vertices.push_back(Point{xB, axis_world_ys[axis + 1], color});
+        }
+
         clear_parallel_pending_markers();
-        NDPoint nd; nd.ys = axis_world_ys;
-        traits.push_back(Trait{.type = TraitType::PARALLEL_POINT, .data = nd});
+        NDPoint nd {axis_world_ys};
+        traits.push_back(Trait{.type = TraitType::PARALLEL_POINT, .data = nd, .color_id = color_id});
+        setup_traits();
     }
 
     void AttribRenderer::select_parallel_region_by_ranges(const std::vector<std::pair<float,float>>& axis_world_ranges) {
-        if (descriptors.size() < 3 || !data) return;
-        size_t n = descriptors.size(); if (axis_world_ranges.size() != n) return;
-        parallel_region_lines_vertices.clear();
-        parallel_region_fill_vertices.clear();
+        if (descriptors.size() < 3 || !data) {
+            throw std::runtime_error("selected_parallel_region_by_ranges() called with descriptors.size() < 3");
+        }
+
+        size_t n = descriptors.size();
+        if (axis_world_ranges.size() != n) return;
+       
         float span = AXIS_LENGTH; float dx = span / (n - 1); float x0 = -AXIS_LENGTH / 2;
-        for (size_t axis = 0; axis + 1 < n; ++axis) {
-            float xA = x0 + axis * dx; float xB = x0 + (axis+1) * dx;
+        auto color_id = get_color_id();
+        auto& color = global_color_pallete[color_id];
+        for (size_t axis = 0; axis < n - 1; axis++) {
+            float xA = x0 + axis * dx; float xB = x0 + (axis + 1) * dx;
             auto [a0, a1] = axis_world_ranges[axis];
-            auto [b0, b1] = axis_world_ranges[axis+1];
+            auto [b0, b1] = axis_world_ranges[axis + 1];
             if (a0 > a1) std::swap(a0, a1);
             if (b0 > b1) std::swap(b0, b1);
-            parallel_region_lines_vertices.push_back(Vector2f(xA, a0)); parallel_region_lines_vertices.push_back(Vector2f(xB, b0));
-            parallel_region_lines_vertices.push_back(Vector2f(xA, a1)); parallel_region_lines_vertices.push_back(Vector2f(xB, b1));
-            parallel_region_lines_vertices.push_back(Vector2f(xA, a0)); parallel_region_lines_vertices.push_back(Vector2f(xA, a1));
-            parallel_region_lines_vertices.push_back(Vector2f(xB, b0)); parallel_region_lines_vertices.push_back(Vector2f(xB, b1));
-            Vector2f v0(xA, a0), v1(xA, a1), v2(xB, b0), v3(xB, b1);
+            parallel_region_lines_vertices.push_back(Point{xA, a0, color}); parallel_region_lines_vertices.push_back(Point{xB, b0, color});
+            parallel_region_lines_vertices.push_back(Point{xA, a1, color}); parallel_region_lines_vertices.push_back(Point{xB, b1, color});
+            parallel_region_lines_vertices.push_back(Point{xA, a0, color}); parallel_region_lines_vertices.push_back(Point{xA, a1, color});
+            parallel_region_lines_vertices.push_back(Point{xB, b0, color}); parallel_region_lines_vertices.push_back(Point{xB, b1, color});
+            
+            Point v0{xA, a0, color}, v1{xA, a1, color}, v2{xB, b0, color}, v3{xB, b1, color};
+            
             parallel_region_fill_vertices.push_back(v0);
             parallel_region_fill_vertices.push_back(v2);
             parallel_region_fill_vertices.push_back(v1);
@@ -418,75 +443,71 @@ namespace MVF {
             parallel_region_fill_vertices.push_back(v2);
             parallel_region_fill_vertices.push_back(v3);
         }
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_lines_region);
-        glBufferData(GL_ARRAY_BUFFER, parallel_region_lines_vertices.size() * sizeof(Vector2f), parallel_region_lines_vertices.data(), GL_DYNAMIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_parallel_region_fill);
-        glBufferData(GL_ARRAY_BUFFER, parallel_region_fill_vertices.size() * sizeof(Vector2f), parallel_region_fill_vertices.data(), GL_DYNAMIC_DRAW);
+
         clear_parallel_pending_markers();
         Range r; r.type = RangeType::HYPERBOX; r.range = HyperBox{.yranges = axis_world_ranges};
-        traits.push_back(Trait{.type = TraitType::RANGE, .data = r});
+        traits.push_back(Trait{.type = TraitType::RANGE, .data = r, .color_id = color_id});
+        setup_traits();
     }
 
     void AttribRenderer::render() {
         glClear(GL_COLOR_BUFFER_BIT);
+
         if (descriptors.empty()) return;
+        
         const Vector4f box_color(0, 0, 0, 1.0f);
         auto pipeline_axis = reinterpret_cast<AxisPipeline*>(pipelines[static_cast<int>(PipelineType::AXIS)]);
         glUseProgram(pipeline_axis->shader_program);
         glUniform4fv(pipeline_axis->uColor, 1, (float*)&box_color);
-        if (descriptors.size() == 1 || descriptors.size() == 2) {
+
+        if (descriptors.size() <= 2) {
             glBindVertexArray(vao_x_axis);
             glDrawArrays(GL_TRIANGLES, 0, axis_mesh_x.vertices.size());
         }
+
         if (descriptors.size() == 1 && is_plot_visible && dist_plot_solid.size()) {
-            const Vector4f rect_color(1, 0, 1, 1); glUniform4fv(pipeline_axis->uColor, 1, (float*)&rect_color);
-            glBindVertexArray(vao_distplotsolid); glDrawArrays(GL_TRIANGLES, 0, dist_plot_solid.size());
-            const Vector4f line_color(0, 0, 0, 1); glUniform4fv(pipeline_axis->uColor, 1, (float*)&line_color);
-            glBindVertexArray(vao_distplotlines); glDrawArrays(GL_LINES, 0, dist_plot_lines.size());
+            const Vector4f rect_color(1, 0, 1, 1);
+            glUniform4fv(pipeline_axis->uColor, 1, (float*)&rect_color);
+            glBindVertexArray(vao_distplotsolid);
+            glDrawArrays(GL_TRIANGLES, 0, dist_plot_solid.size());
+            
+            const Vector4f line_color(0, 0, 0, 1);
+            glUniform4fv(pipeline_axis->uColor, 1, (float*)&line_color);
+            glBindVertexArray(vao_distplotlines);
+            glDrawArrays(GL_LINES, 0, dist_plot_lines.size());
         }
         else if (descriptors.size() == 2) {
-            glBindVertexArray(vao_y_axis); glDrawArrays(GL_TRIANGLES, 0, axis_mesh_y.vertices.size());
+            glBindVertexArray(vao_y_axis); 
+            glDrawArrays(GL_TRIANGLES, 0, axis_mesh_y.vertices.size());
             if (is_plot_visible && scatter_plot.size()) {
-                const Vector4f point_color(1, 0, 1, 1); glUniform4fv(pipeline_axis->uColor, 1, (float*)&point_color);
-                glBindVertexArray(vao_scatterplot); glDrawArrays(GL_POINTS, 0, scatter_plot.size());
+                const Vector4f point_color(1, 0, 1, 1);
+                glUniform4fv(pipeline_axis->uColor, 1, (float*)&point_color);
+                glBindVertexArray(vao_scatterplot);
+                glDrawArrays(GL_POINTS, 0, scatter_plot.size());
             }
         }
-        else if (descriptors.size() > 2 && is_plot_visible) {
-            if (!parallel_axes_vertices.empty()) {
-                const Vector4f axis_color(0, 0, 0, 1); glUniform4fv(pipeline_axis->uColor, 1, (float*)&axis_color);
-                glBindVertexArray(vao_parallel_axes);
-                glDrawArrays(GL_LINES, 0, parallel_axes_vertices.size());
+        else if (descriptors.size() > 2) {
+            const Vector4f axis_color(0, 0, 0, 1);
+            glUniform4fv(pipeline_axis->uColor, 1, (float*)&axis_color);
+            glBindVertexArray(vao_parallel_axes);
+            glDrawArrays(GL_LINES, 0, parallel_axes_vertices.size());
+            
+            if (is_plot_visible) {
+                if (!parallel_lines_vertices.empty()) {
+                    const Vector4f line_color(1.0f, 0.0f, 0.0f, 0.35f);
+                    glUniform4fv(pipeline_axis->uColor, 1, (float*)&line_color);
+                    glBindVertexArray(vao_parallel_lines);
+                    glDrawArrays(GL_LINES, 0, parallel_lines_vertices.size());
+                }
             }
-            if (!parallel_lines_vertices.empty()) {
-                const Vector4f line_color(1.0f, 0.0f, 0.0f, 0.35f);
-                glUniform4fv(pipeline_axis->uColor, 1, (float*)&line_color);
-                glBindVertexArray(vao_parallel_lines);
-                glDrawArrays(GL_LINES, 0, parallel_lines_vertices.size());
-            }
-            if (!parallel_region_fill_vertices.empty()) {
-                const Vector4f fill_color(1.0f, 1.0f, 0.0f, 0.2f);
-                glUniform4fv(pipeline_axis->uColor, 1, (float*)&fill_color);
-                glBindVertexArray(vao_parallel_region_fill);
-                glDrawArrays(GL_TRIANGLES, 0, parallel_region_fill_vertices.size());
-            }
-            if (!parallel_region_lines_vertices.empty()) {
-                const Vector4f region_color(1.0f, 0.9f, 0.0f, 0.9f);
-                glUniform4fv(pipeline_axis->uColor, 1, (float*)&region_color);
-                glBindVertexArray(vao_parallel_lines_region);
-                glDrawArrays(GL_LINES, 0, parallel_region_lines_vertices.size());
-            }
-            if (!parallel_highlight_lines_vertices.empty()) {
-                const Vector4f sel_color(0.1f, 0.3f, 1.0f, 1.0f);
-                glUniform4fv(pipeline_axis->uColor, 1, (float*)&sel_color);
-                glBindVertexArray(vao_parallel_lines_highlight);
-                glDrawArrays(GL_LINES, 0, parallel_highlight_lines_vertices.size());
-            }
-            if (has_pending_markers && !parallel_pending_marker_positions.empty()) {
+            
+            // Draw any pending marker positions
+            if (!parallel_pending_marker_positions.empty()) {
                 auto pipeline_marker = reinterpret_cast<MarkerPipeline*>(pipelines[static_cast<int>(PipelineType::MARKER)]);
                 glUseProgram(pipeline_marker->shader_program);
                 glUniform1f(pipeline_marker->uAlpha, 1.0f);
-                glBindVertexArray(vao_parallel_marker);
-                glDrawArraysInstanced(GL_TRIANGLES, 0, marker.vertices.size(), static_cast<GLsizei>(parallel_pending_marker_positions.size()));
+                glBindVertexArray(vao_marker);
+                glDrawArraysInstanced(GL_TRIANGLES, 0, marker.vertices.size(), parallel_pending_marker_positions.size());
             }
         }
         
@@ -502,16 +523,16 @@ namespace MVF {
             glBindVertexArray(vao_marker);
             glDrawArraysInstanced(GL_TRIANGLES, 0, marker.vertices.size(), point_traits);
         }
-       
+      
+        // Draw 2d range traits
         auto pipeline_color = reinterpret_cast<ColorPipeline*>(pipelines[static_cast<int>(PipelineType::COLOR)]);
+        glUseProgram(pipeline_color->shader_program);
         if (num_interval_vertices) {
-            glUseProgram(pipeline_color->shader_program);
             glUniform1f(pipeline_color->uAlpha, 0.5f);
 
             glBindVertexArray(vao_interval);
             glDrawArrays(GL_TRIANGLES, 0, num_interval_vertices);
         } else if (num_range_tri_vertices) {
-            glUseProgram(pipeline_color->shader_program);
             glUniform1f(pipeline_color->uAlpha, 0.5f);
 
             glBindVertexArray(vao_polyline);
@@ -521,10 +542,35 @@ namespace MVF {
             glBindVertexArray(vao_polypoint);
             glDrawArrays(GL_POINTS, 0, num_range_pt_vertices);
         }
+       
+        // Draw parallel point traits
+        auto parallel_traits = std::ranges::distance(traits | std::views::filter([] (auto& trait) {
+            return trait.type == TraitType::PARALLEL_POINT;
+        }));
+
+        if (parallel_traits && !parallel_highlight_lines_vertices.empty()) {
+            glUniform1f(pipeline_color->uAlpha, 1.0f);
+            glBindVertexArray(vao_parallel_lines_highlight);
+            glDrawArrays(GL_LINES, 0, parallel_highlight_lines_vertices.size());
+        }
+        
+        if (!parallel_region_fill_vertices.empty()) {
+            glUniform1f(pipeline_color->uAlpha, 0.5f);
+            glBindVertexArray(vao_parallel_region_fill);
+            glDrawArrays(GL_TRIANGLES, 0, parallel_region_fill_vertices.size());
+        }
+        if (!parallel_region_lines_vertices.empty()) {
+            glUniform1f(pipeline_color->uAlpha, 1.0f);
+            glBindVertexArray(vao_parallel_lines_region);
+            glDrawArrays(GL_LINES, 0, parallel_region_lines_vertices.size());
+        }
+
         glBindVertexArray(0);
     }
 
-    void AttribRenderer::resync() { setup_buffers(); }
+    void AttribRenderer::resync() { 
+        setup_buffers(); 
+    }
 
     void AttribRenderer::set_range_trait(float x1, float x2) {
         if (descriptors.size() != 1 || std::abs(x1) >= AXIS_LENGTH / 2 || std::abs(x2) >= AXIS_LENGTH / 2) return;
@@ -571,7 +617,9 @@ namespace MVF {
         setup_traits();
     }
     
-    void AttribRenderer::set_point_trait(float x) { set_point_trait(x, 0); }
+    void AttribRenderer::set_point_trait(float x) { 
+        set_point_trait(x, 0);
+    }
 
     void AttribRenderer::set_point_trait(float x, float y) {
         if (descriptors.size() < 1 || std::abs(x) >= AXIS_LENGTH / 2 || std::abs(y) >= AXIS_LENGTH / 2) return;
@@ -586,89 +634,6 @@ namespace MVF {
         return 0.5f * ((desc.max_val + desc.min_val) + u_norm * (desc.max_val - desc.min_val));
     }
 
-    std::pair<float, float> AttribRenderer::screen_to_world(double sx, double sy) {
-        float ndc_x = (float)(sx / viewport_width) * 2.0f - 1.0f;
-        float ndc_y = 1.0f - (float)(sy / viewport_height) * 2.0f;
-        float wx = ndc_x * (AXIS_LENGTH / 2.0f);
-        float wy = ndc_y * (AXIS_LENGTH / 2.0f);
-        return { wx, wy };
-    }
-
-    std::pair<float, float> AttribRenderer::world_to_screen(float wx, float wy) {
-        float ndc_x = wx / (AXIS_LENGTH / 2.0f);
-        float ndc_y = wy / (AXIS_LENGTH / 2.0f);
-        float sx = (ndc_x * 0.5f + 0.5f) * viewport_width;
-        float sy = (0.5f - ndc_y * 0.5f) * viewport_height;
-        return { sx, sy };
-    }
-
-    void AttribRenderer::on_mouse_move(double mx, double my) {
-        auto [w_x, w_y] = screen_to_world(mx, my);
-        hovered_axis = -1;
-        hovered_world_y = 0.0f;
-        hover_text.clear();
-        if (descriptors.size() < 3) return;
-        size_t n = descriptors.size();
-        float span = AXIS_LENGTH;
-        float dx = span / (n - 1);
-        float x0 = -AXIS_LENGTH / 2.0f;
-        constexpr float HIT_THRESHOLD = 0.03f * AXIS_LENGTH;
-        for (size_t i = 0; i < n; ++i) {
-            float axis_x = x0 + i * dx;
-            if (std::abs(w_x - axis_x) <= HIT_THRESHOLD) {
-                hovered_axis = static_cast<int>(i);
-                hovered_world_y = w_y;
-                auto& meta = descriptors[i];
-                float unorm = w_y / (AXIS_LENGTH / 2.0f);
-                unorm = std::clamp(unorm, -1.0f, 1.0f);
-                float real_val = 0.5f * ((meta.max_val + meta.min_val) + unorm * (meta.max_val - meta.min_val));
-                hover_text = std::format("{} = {:.6g}", meta.desc.comp_name, real_val);
-                return;
-            }
-        }
-    }
-
-    void AttribRenderer::draw_overlay_cairo(cairo_t* cr) {
-        if (descriptors.size() < 3) return;
-        PangoLayout* layout = pango_cairo_create_layout(cr);
-        PangoFontDescription* fd = pango_font_description_from_string("Sans 11");
-        pango_layout_set_font_description(layout, fd);
-        pango_font_description_free(fd);
-        size_t n = descriptors.size();
-        float span = AXIS_LENGTH;
-        float dx = span / (n - 1);
-        float x0 = -AXIS_LENGTH / 2.0f;
-        for (size_t i = 0; i < n; ++i) {
-            float wx = x0 + i * dx;
-            float wy = AXIS_LENGTH / 2.0f;
-            auto [sx, sy] = world_to_screen(wx, wy);
-            std::string name = descriptors[i].desc.comp_name;
-            pango_layout_set_text(layout, name.c_str(), -1);
-            int px, py; pango_layout_get_pixel_size(layout, &px, &py);
-            cairo_move_to(cr, sx - px * 0.5, sy - py - 6);
-            cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.85);
-            cairo_rectangle(cr, sx - px * 0.5 - 4, sy - py - 8, px + 8, py + 6);
-            cairo_fill(cr);
-            cairo_set_source_rgb(cr, 0.05, 0.05, 0.05);
-            pango_cairo_show_layout(cr, layout);
-        }
-        if (hovered_axis >= 0 && !hover_text.empty()) {
-            float axis_x_world = x0 + hovered_axis * dx;
-            auto [sx, sy] = world_to_screen(axis_x_world, hovered_world_y);
-            pango_layout_set_text(layout, hover_text.c_str(), -1);
-            int px, py; pango_layout_get_pixel_size(layout, &px, &py);
-            const float margin = 6.0f;
-            float box_x = sx + margin; float box_y = sy - py * 0.5f;
-            cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.9);
-            cairo_rectangle(cr, box_x - 4, box_y - 4, px + 8, py + 8);
-            cairo_fill(cr);
-            cairo_set_source_rgb(cr, 0.05, 0.05, 0.05);
-            cairo_move_to(cr, box_x, box_y + 2);
-            pango_cairo_show_layout(cr, layout);
-        }
-        g_object_unref(layout);
-    }
-
     void AttribRenderer::clear_plot() {
         scatter_plot.clear();
         dist_plot_solid.clear();
@@ -679,7 +644,6 @@ namespace MVF {
         parallel_region_lines_vertices.clear();
         parallel_region_fill_vertices.clear();
         parallel_pending_marker_positions.clear();
-        has_pending_markers = false;
         is_plot_visible = false;
     }
 }

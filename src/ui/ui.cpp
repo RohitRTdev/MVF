@@ -7,15 +7,6 @@ using namespace Gtk;
 
 MainWindow* global_ui_inst = nullptr;
 
-void MainWindow::on_traits_completed() {
-    // if feature space visible, defer until domain space view is active
-    if (is_feature_space_visible) {
-        trait_handler_pending = true;
-    } else {
-        attrib_panel.set_button_active();
-    }
-}
-
 // This is a side channel generic function any entity can use to communicate to UI when there 
 // is need for asynchronous computation
 void advance_ui_clock(float fraction, bool complete) {
@@ -218,11 +209,15 @@ spatial_panel(&spatial_handler), attrib_panel(&attrib_handler), field_panel(&fie
     set_focusable(true); 
     
     attrib_panel.show_attrib.signal_toggled().connect(sigc::mem_fun(*this, &MainWindow::toggle_attrib_space));
-
     auto mouse_click = GestureClick::create();
     mouse_click->signal_pressed().connect([this] (int, double, double) {
         if (attrib_handler.handle_traits) {
-            on_traits_completed();
+            if (is_feature_space_visible) {
+                trait_handler_pending = true;
+            }
+            else {
+                attrib_panel.set_button_active();
+            }
             attrib_handler.handle_traits = false;
         }
     });
@@ -412,7 +407,7 @@ bool MainWindow::file_load_handler() {
         std::cout << "Loaded VTK: " << loader->data->nx << " x " << loader->data->ny << " x " << loader->data->nz << " with fields:" << std::endl;
 
         for (auto& [key, val]: loader->data->scalars) {
-            std::cout << key << " -> " << std::get<0>(val).size() << ", " << std::get<1>(val) << std::endl;
+            std::cout << key << " -> " << val.size() << std::endl;
         }
 
         std::cout << "Origin: " << loader->data->origin.x << ',' << loader->data->origin.y << ',' << loader->data->origin.z << std::endl;

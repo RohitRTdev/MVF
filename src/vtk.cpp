@@ -131,12 +131,13 @@ namespace MVF {
                             read_failed = true;
                             return;
                         }
-                        data->scalars[cur_tag] = std::make_tuple(std::vector<float>(count * comps), comps);
+
+                        data->scalars[cur_tag] = std::vector<float>(count * comps);
                         ++ptr; // advance past newline if present
                         cur_field_idx = 0;
                     }
 
-                    auto& dest = std::get<0>(data->scalars[cur_tag]);
+                    auto& dest = data->scalars[cur_tag];
 
                     while (ptr < end && cur_field_idx < field_size) {
                         // Skip whitespace
