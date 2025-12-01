@@ -1,13 +1,13 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -e
 
 # Utility functions
 info() { echo "[INFO] $*"; }
 err()  { 
-  echo "[ERROR] $1" >&2;
-  rm -f "$TMPFILE" "$OUTFILE";
+  echo "[ERROR] $1" >&2
+  rm -f "$TMPFILE" "$OUTFILE"
   if [ $2 -eq 1 ]; then 
-    exit 1;
+    exit 1
   fi
 }
 
@@ -19,7 +19,6 @@ check_compiler_support() {
 
   info "Detected compiler: $1"
 
-  # Check for C++23 support
   info "Checking for C++23 support..."
   TMPFILE="$(mktemp testcppXXXXXX.cpp)"
   OUTFILE="$(mktemp testoutXXXX.exe)"

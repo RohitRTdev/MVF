@@ -32,34 +32,118 @@ namespace MVF {
         size_t total_fields = 0;
         std::ifstream file(filename, std::ios::binary);
         auto proxy = std::make_unique<LoadProxy>();
+        proxy->read_failed = true;
         if (!file) {
             std::cerr << "Failed to open " << filename << "\n";
-            proxy->read_failed = true;
             return proxy;
         }
 
-        std::string line;
-        while (std::getline(file, line)) {
+        std::array<std::string, 4> header = {"# vtk DataFile Version 5.1", "vtk output", "ASCII", 
+                    "DATASET STRUCTURED_POINTS"};
+        
+        size_t header_idx = 0;
+        std::string line, tag;
+        auto clean_line = [&](std::string& s) {
+            if (!s.empty() && s.back() == '\r')
+                s.pop_back();
+        };
+
+        while (header_idx < header.size()) {
+            if (!std::getline(file, line)) {
+    #ifdef MVF_DEBUG
+                std::cerr << "Missing line: " << header[header_idx] << std::endl;
+    #endif
+                return proxy;
+            }
+
+            clean_line(line);
+            if (line != header[header_idx]) {
+    #ifdef MVF_DEBUG
+                std::cerr << "Expected line: " << header[header_idx] << std::endl;
+    #endif
+                return proxy;
+            }
+
+            header_idx++;
+        }
+
+        if (!std::getline(file, line)) {
+#ifdef MVF_DEBUG
+            std::cerr << "Missing DIMENSIONS line" << std::endl;
+#endif
+            return proxy;
+        }
+        {
             std::istringstream ss(line);
-            std::string tag;
-            if (line.rfind("DIMENSIONS", 0) == 0) {
-                ss >> tag >> vol->nx >> vol->ny >> vol->nz;
-            } 
-            else if (line.rfind("SPACING", 0) == 0) {
-                ss >> tag >> vol->spacing.x >> vol->spacing.y >> vol->spacing.z;
-            } 
-            else if (line.rfind("ORIGIN", 0) == 0) {
-                ss >> tag >> vol->origin.x >> vol->origin.y >> vol->origin.z;
-            } 
-            else if (line.rfind("FIELD", 0) == 0) {
-                size_t fields;
-                std::string _name;
-                ss >> tag >> _name >> fields;
-                total_fields = fields;
-                total_bytes = fields * vol->nx * vol->ny * vol->nz;
-                break;
+            if (!(ss >> tag >> vol->nx >> vol->ny >> vol->nz) || tag != "DIMENSIONS") {
+#ifdef MVF_DEBUG
+                std::cerr <<"Invalid DIMENSIONS format" << std::endl;
+#endif
+                return proxy;
             }
         }
+
+        if (!std::getline(file, line)) {
+#ifdef MVF_DEBUG
+            std::cerr << "Missing SPACING line" << std::endl;
+#endif
+            return proxy;
+        }
+        {
+            std::istringstream ss(line);
+            if (!(ss >> tag >> vol->spacing.x >> vol->spacing.y >> vol->spacing.z) || tag != "SPACING") {
+#ifdef MVF_DEBUG    
+                std::cerr << "Invalid SPACING format" << std::endl;
+#endif
+                return proxy;
+            }
+        }
+
+        if (!std::getline(file, line)) {
+#ifdef MVF_DEBUG
+            std::cerr << "Missing ORIGIN line" << std::endl;
+#endif
+            return proxy;
+        } 
+        {
+            std::istringstream ss(line);
+            if (!(ss >> tag >> vol->origin.x >> vol->origin.y >> vol->origin.z) || tag != "ORIGIN") {
+#ifdef MVF_DEBUG
+                std::cerr << "Invalid ORIGIN format" << std::endl;
+#endif
+                return proxy;
+            }
+        }
+        
+        if (!std::getline(file, line)) {
+#ifdef MVF_DEBUG
+            std::cerr << "Missing POINT_DATA line" << std::endl;
+#endif
+            return proxy;
+        }
+
+        if (!std::getline(file, line)) {
+#ifdef MVF_DEBUG
+            std::cerr << "Missing FIELD line" << std::endl;
+#endif
+            return proxy;
+        }
+        {
+            std::istringstream ss(line);
+            std::string _name;
+            size_t fields = 0;
+
+            if (!(ss >> tag >> _name >> fields) || tag != "FIELD") {
+#ifdef MVF_DEBUG
+                std::cerr << "Invalid FIELD format" << std::endl;
+#endif
+                return proxy;
+            }
+
+            total_fields = fields;
+            total_bytes = fields * vol->nx * vol->ny * vol->nz;
+        }
+
 
         vol->filename = filename;
 
