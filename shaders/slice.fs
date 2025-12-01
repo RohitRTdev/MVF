@@ -1,11 +1,12 @@
-#version 330 core
-in vec2 vUV;
-out vec4 FragColor;
+#version 460 core
 
-uniform sampler2D uTex; // R8 normalized slice values in [0,1]
+in vec3 atex_coord;
 
-// Simple multi-stop blue->cyan->green->yellow->red colormap
-vec3 colormap(float t){
+uniform sampler3D slice_tex;
+
+out vec4 frag_color;
+
+vec3 color_map(float t) {
     t = clamp(t, 0.0, 1.0);
     if (t < 0.25) { // blue -> cyan
         float u = t / 0.25;
@@ -23,7 +24,5 @@ vec3 colormap(float t){
 }
 
 void main(){
-    float v = texture(uTex, vUV).r; // already normalized 0..1
-    vec3 c = colormap(v);
-    FragColor = vec4(c, 1.0);
+    frag_color = vec4(color_map(texture(slice_tex, atex_coord).r), 1.0);
 }

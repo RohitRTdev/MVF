@@ -86,11 +86,11 @@ namespace MVF {
 
         struct SliceBufferEntity {
             bool is_active = false;
-            GLuint vao_slice = 0;
-            GLuint vbo_slice = 0; // pos(3) + uv(2)
-            GLuint tex_slice = 0; // GL_R8
-            int tex_w = 0;
-            int tex_h = 0;
+            GLuint vao = 0;
+            GLuint vbo = 0;
+            GLuint ebo = 0;
+            GLuint tex3d = 0;
+            const std::array<uint32_t, 6> eb = {0, 1, 2, 0, 2, 3};
         };
 
         struct DVRBufferEntity {
@@ -111,10 +111,8 @@ namespace MVF {
         void set_vector_mode(const std::string& field1, const std::string& field2, const std::string& field3);
         void set_scalar_slice(const std::string& field, int axis = 2);
         void set_slice_position(float t);
-        void set_slice_axis(int axis); // change axis without altering field
-        int get_slice_axis() const;    // query current slice axis or -1 if not in slice mode
-        float get_slice_position() const; // current normalized slice position
-        void set_dvr(const std::string& field); // new: enable DVR on a scalar field
+        void set_slice_axis(int axis);
+        void set_dvr(const std::string& field);
         EntityMode get_mode() const;
         void scale(float factor);
         void reset_transform(); 
@@ -147,9 +145,8 @@ namespace MVF {
 
         std::vector<std::string> fields;
         std::vector<Pipeline*> pipelines;
-        int selectedField = -1;
 
-        float slice_t = 0.5f; // [0,1]
+        float slice_t = 0.5f;
 
         void compute_bounding_box();
         void init(std::vector<Pipeline*>& pipelines);
@@ -157,7 +154,7 @@ namespace MVF {
         void create_vertex_array();
         void create_bounding_box_buffers(); 
         void create_buffers();
-        void update_slice_resources();
+        void make_slice();
         void update_dvr_resources();
         void draw() override;
     };

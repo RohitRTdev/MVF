@@ -21,6 +21,15 @@ namespace MVF {
         }
     };
     
+    struct VertexTex {
+        float x, y, z;
+        float u, v, w;
+
+        operator Vector3f() const {
+            return Vector3f(x, y, z);
+        }
+    };
+    
     struct ArrowVertex {
         float x, y, z; // Position
         float u, v, w; // Normal

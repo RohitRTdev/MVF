@@ -51,7 +51,6 @@ namespace MVF {
 
     struct SlicePipeline : Pipeline {
         GLuint uMVP;
-        GLuint uTex;
         SlicePipeline();
     };
 

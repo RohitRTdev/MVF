@@ -117,7 +117,7 @@ namespace MVF{
 
     SlicePipeline::SlicePipeline() : Pipeline("shaders/slice.vs", "shaders/slice.fs", PipelineType::SLICE) {
         uMVP = get_uniform_var("uMVP");
-        uTex = get_uniform_var("uTex");
+        glUniform1i(glGetUniformLocation(shader_program, "slice_tex"), 0);
     }
 
     DvrPipeline::DvrPipeline() : Pipeline("shaders/dvr.vs", "shaders/dvr.fs", PipelineType::DVR) {

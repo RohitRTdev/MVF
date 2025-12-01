@@ -377,6 +377,7 @@ void MainWindow::on_file_open() {
            
             loader = MVF::open_vtk_async(filename);
             if (loader->read_failed) {
+                MVF::app_warn("File format not supported");
                 return;
             }
             

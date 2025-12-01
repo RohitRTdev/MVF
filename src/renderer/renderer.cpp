@@ -125,7 +125,6 @@ namespace MVF {
             auto pipeline_slice = reinterpret_cast<SlicePipeline*>(pipelines[static_cast<int>(PipelineType::SLICE)]);
             glUseProgram(pipeline_slice->shader_program);
             glUniformMatrix4fv(pipeline_slice->uMVP, 1, GL_TRUE, &mvp.m[0][0]);
-            glUniform1i(pipeline_slice->uTex, 0);
         }
         else if (entity.get_mode() == EntityMode::DVR) {
             auto pipeline_dvr = reinterpret_cast<DvrPipeline*>(pipelines[static_cast<int>(PipelineType::DVR)]);
