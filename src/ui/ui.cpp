@@ -374,7 +374,15 @@ void MainWindow::on_file_open() {
     dialog->signal_response().connect([dialog, this](int response) {
         if (response == Gtk::ResponseType::ACCEPT) {
             auto filename = dialog->get_file()->get_path();
-           
+          
+            // Another loader operation is going on. Simply terminate current file load
+            if (is_async_ui_state || file_loader_conn.connected()) {
+#ifdef MVF_DEBUG
+                std::cout << "Timer lock held. Terminating IO op..." << std::endl; 
+#endif
+                return;
+            }
+
             loader = MVF::open_vtk_async(filename);
             if (loader->read_failed) {
                 MVF::app_warn("File format not supported");

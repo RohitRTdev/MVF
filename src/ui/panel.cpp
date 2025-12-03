@@ -28,7 +28,7 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
         auto text = rep_menu.get_active_text();
 
         auto spatial_renderer = static_cast<MVF::SpatialRenderer*>(this->handler->renderer);
-        if (text == "Volume" && selected_mode != Selection::VOLUME) {
+        if (text == "Glyph" && selected_mode != Selection::GLYPH) {
             this->handler->make_current();
             if (selected_comps.size() == 2) {
                 spatial_renderer->entity.set_vector_mode(selected_comps[0], selected_comps[1]);
@@ -38,7 +38,7 @@ SpatialPanel::SpatialPanel(MVF::SpatialHandler* handler) : handler(handler), sli
             }
 
             this->handler->queue_render();
-            selected_mode = Selection::VOLUME;
+            selected_mode = Selection::GLYPH;
         }
         else if (text == "Slice" && selected_mode != Selection::SLICE) {
             this->handler->make_current();
@@ -151,7 +151,7 @@ void SpatialPanel::on_selection() {
     }
     
     if (comps.size() > 1) {
-        rep_menu.append("Volume");
+        rep_menu.append("Glyph");
     }
     else if (comps.size() == 1) {
         rep_menu.append("Slice");

@@ -63,6 +63,10 @@ namespace MVF {
 
         glBindVertexArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+#ifdef MVF_DEBUG
+        std::cout << "Created field buffers..." << std::endl;
+#endif
     }
 
     void FieldEntity::create_voxel_grid() {
@@ -347,7 +351,7 @@ namespace MVF {
         glDrawArrays(GL_POINTS, 0, res_x * res_y * res_z);
         glBindVertexArray(0); 
     }
-
+	
     void FieldRenderer::init(int width, int height) {
         SpatialRenderer::init(width, height);
         entity.init(&this->SpatialRenderer::entity);

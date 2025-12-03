@@ -22,7 +22,7 @@ public:
 private:
     enum class Selection {
         NONE,
-        VOLUME,
+        GLYPH,
         SLICE,
         DVR
     };
