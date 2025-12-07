@@ -355,7 +355,6 @@ FieldPanel::FieldPanel(MVF::SpatialHandler* handler) : handler(handler), iso_sli
     set_label("Feature panel");
 
     rep_menu.append("Isosurface");
-    rep_menu.append("DVR");
     rep_menu.set_active(0);
 
     auto vbox = make_managed<Box>(Orientation::VERTICAL);
